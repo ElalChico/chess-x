@@ -666,7 +666,11 @@ function go(s){
   document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
   if(s!=='game'){document.body.classList.remove('fs');const f=document.getElementById('fsBtn');if(f)f.textContent=T[lang].fsOn;if(tickTimer)clearInterval(tickTimer);sel=null}
   if(s==='lobby'){refreshProfile();updateSessionUI()}
-  if(s==='game')startTicking();
+  if(s==='game'){
+    // Ensure board is rendered with current state (initial position if no active game)
+    render();
+    startTicking();
+  }
   requestAnimationFrame(fitBoard);
 }
 function toggleFullscreen(){
