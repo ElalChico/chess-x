@@ -1,0 +1,1933 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>CHESS-X — Ajedrez Bluetooth</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88' fill='%23E2B94E'>X</text></svg>"/>
+<style>
+:root{
+  --bg:#0B0D10;
+  --surface:#13171D;
+  --card:#171D25;
+  --card2:#1C232D;
+  --line:#252E39;
+  --line2:#2F3947;
+  --text:#EEF1F5;
+  --muted:#8B96A5;
+  --gold:#E2B94E;
+  --gold2:#C9A03E;
+  --green:#3DDC97;
+  --red:#FF6B6B;
+  --blue:#5B9DF9;
+  --board-light:#EAD7BC;
+  --board-dark:#7A5636;
+  --board-dark2:#6B4A2E;
+  --sel:#F6E25C;
+  --last:#C7B84E;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100%}
+body{
+  background:
+    radial-gradient(1000px 600px at 15% -10%, #1B2330 0%, transparent 55%),
+    radial-gradient(900px 700px at 110% 110%, #141E18 0%, transparent 50%),
+    var(--bg);
+  color:var(--text);
+  font-family:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  display:flex;align-items:center;justify-content:center;
+  min-height:100dvh;
+  padding:24px 14px;
+}
+.phone{
+  width:400px;max-width:100%;
+  background:#000;
+  border-radius:44px;
+  padding:10px;
+  border:1px solid #2A323D;
+  box-shadow:0 40px 90px #000C,0 0 0 1px #000, inset 0 0 0 1px #000;
+}
+.screen{
+  background:var(--bg);
+  border-radius:34px;
+  overflow:hidden;
+  display:flex;flex-direction:column;
+  height:min(820px,calc(100dvh - 36px));
+  min-height:640px;
+  position:relative;
+}
+/* status bar */
+.statusbar{display:flex;justify-content:space-between;align-items:center;padding:12px 20px 0;font-size:12px;font-weight:600;color:#D8DEE8;flex:0 0 auto}
+.statusbar .icons{display:flex;gap:6px;align-items:center;color:#D8DEE8}
+/* phone content */
+.sc{display:none;flex:1;min-height:0;flex-direction:column;overflow:hidden}
+.sc.on{display:flex}
+.btn small{display:block;margin-top:2px}
+.btn-alt small{font-size:10.5px;color:var(--muted);font-weight:600;letter-spacing:.2px}
+.content{padding:10px 16px;flex:1;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
+.powered{font-size:10px;color:var(--muted);text-align:center;line-height:1.5;opacity:.7}
+/* top bar */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.logo{width:50px;height:50px;border-radius:15px;display:flex;align-items:center;justify-content:center;
+  background:#11161D;border:1px solid #1E2630;overflow:hidden}
+.brand h1{font-size:21px;letter-spacing:1px;font-weight:800}
+.brand{display:flex;gap:11px;align-items:center}
+.brand p{font-size:11px;color:var(--muted);margin-top:2px}
+.spp{display:inline-flex;align-items:center;gap:7px;font-size:11px;color:#9BE3BD;
+  background:#12241B;border:1px solid #1E3B2B;border-radius:999px;padding:6px 11px;letter-spacing:.4px;font-weight:600}
+.spp .pulse{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 #3DDC9770;animation:pl 1.6s infinite}
+@keyframes pl{0%{box-shadow:0 0 0 0 #3DDC9750}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
+/* hero card */
+.hero{background:linear-gradient(160deg,#1A222C,#12171F 70%);border:1px solid var(--line);border-radius:20px;padding:14px 14px 12px;position:relative;max-width:100%}
+.hero h2{font-size:clamp(14px,4.2vw,16px);font-weight:750;letter-spacing:-.2px;line-height:1.2;overflow-wrap:anywhere}
+.hero p{font-size:11px;color:var(--muted);line-height:1.45;margin-top:6px;overflow-wrap:anywhere}
+.stats{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.stat{flex:1 1 30%;min-width:70px;background:#10151C;border:1px solid var(--line);border-radius:12px;padding:8px 9px}
+.stat b{font-size:14px;letter-spacing:-.2px}
+.stat span{display:block;font-size:10.5px;color:var(--muted);margin-top:2px}
+/* big CTAs */
+.btn{border:0;cursor:pointer;border-radius:18px;font-weight:750;letter-spacing:.2px;display:flex;align-items:center;gap:12px;width:100%;text-align:left}
+.btn-big{position:relative;padding:14px 16px;font-size:15px;color:#E2B94E;margin-top:0;
+  background:#0F0F0F;
+  box-shadow:inset 0 1px 0 #FFFFFF0A, inset 0 -2px 0 #E2B94E22;border:1.2px solid #E2B94E}
+.btn-big small{display:block;font-size:11px;font-weight:600;opacity:.85;margin-top:3px;letter-spacing:.1px;color:#A8975E}
+.btn-alt{padding:13px 14px;font-size:14px;color:#E2B94E;
+  background:#0F0F0F;border:1.2px solid #3A3524;
+  box-shadow:inset 0 1px 0 #FFFFFF0A, inset 0 -2px 0 #E2B94E1F}
+.btn-alt p,.btn-big p{margin:0}
+.btn-ic{width:40px;height:40px;flex:0 0 40px;border-radius:12px;background:#1A1A14;display:flex;align-items:center;justify-content:center;font-size:20px}
+.btn-big .btn-ic{background:#E2B94E;color:#0F0F0F}
+.btn-alt .btn-ic{background:#1A1A14;color:#E2B94E;border:1px solid #3A3524}
+/* CHESS-X button: negro, texto dorado, borde dorado fino — único estilo */
+.cx-btn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;width:100%;padding:15px 18px;border-radius:15px;border:1.2px solid #3A3524;background:#0F0F0F;color:#E2B94E;font-family:inherit;text-align:left;cursor:pointer;transition:.15s}
+.cx-btn b{font-size:16.5px;font-weight:800;letter-spacing:.2px}
+.cx-btn span{font-size:11px;color:#A8975E;font-weight:600}
+.cx-btn:hover:not(:disabled){border-color:#E2B94E;box-shadow:0 8px 22px -8px #E2B94E33}
+.cx-btn:disabled{opacity:.45;cursor:default}
+.home-cta{display:flex;flex-direction:column;gap:12px}
+.session-note{font-size:11.5px;color:#E2B94E;background:#1A1206;border:1px solid #3A2A10;border-radius:12px;padding:10px 12px;font-weight:700;line-height:1.5}
+/* Firma del desarrollador - visible en home */
+.dev-sign{font-size:10.5px;color:#8B96A5;text-align:center;letter-spacing:.4px;margin-top:14px;font-weight:600}
+/* settings rows */
+.row-card{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:15px;padding:11px 13px}
+.row-card b{font-size:13.5px}
+.row-card small{display:block;color:var(--muted);font-size:11px;margin-top:3px;line-height:1.4}
+.switch{width:50px;height:29px;border-radius:999px;background:#1E2B23;border:1px solid #2A4A33;position:relative;cursor:pointer;flex:0 0 auto;transition:background .2s}
+.switch:after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:linear-gradient(180deg,#fff,#D7D7D7);transition:left .18s cubic-bezier(.4,0,.2,1);box-shadow:0 2px 4px #0007}
+.switch.on{background:#173B28;border-color:#2E5B3E}
+.switch.on:after{left:24px;background:var(--green)}
+/* timer chips */
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{padding:8px 13px;border-radius:999px;font-size:12px;background:var(--card2);border:1px solid var(--line2);color:#C6CDD8;cursor:pointer;font-weight:600}
+.chip.on{background:#2A2412;border-color:var(--gold2);color:var(--gold)}
+/* connect list */
+h2{font-size:21px;letter-spacing:-.3px;font-weight:800}
+.muted{color:var(--muted);font-size:12.5px;line-height:1.5}
+.device{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px}
+.device .av{width:46px;height:46px;border-radius:14px;background:linear-gradient(145deg,#223041,#151B24);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:21px;color:var(--blue)}
+.device b{font-size:14.5px}
+.device small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.linkpill{font-size:10.5px;color:#8FD3FF;background:#122033;border:1px solid #1E3A54;border-radius:6px;padding:2px 7px;display:inline-block;margin-top:4px;font-weight:600}
+.btn-link{background:var(--gold);color:#141414;border:0;border-radius:12px;padding:10px 14px;font-weight:700;font-size:13px;cursor:pointer}
+.found{animation:pop .3s ease both}
+@keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
+/* lobby */
+.field label{font-size:11.5px;color:var(--muted);letter-spacing:.3px;font-weight:600;display:block;margin:6px 0 6px}
+.field input{width:100%;background:#0F141B;border:1px solid var(--line2);border-radius:13px;padding:12px 13px;color:var(--text);font-size:15px;outline:none}
+.field input:focus{border-color:var(--gold2);box-shadow:0 0 0 3px #E2B94E22}
+.timegrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:4px 0 2px}
+.tc{background:var(--card2);border:1px solid var(--line2);border-radius:14px;padding:12px 6px;text-align:center;cursor:pointer;color:var(--muted);transition:all .15s}
+.tc b{display:block;font-size:16px;color:var(--text);letter-spacing:-.2px}
+.tc span{font-size:10px;display:block;margin-top:3px}
+.tc.on{border-color:var(--gold);background:#26200F;transform:translateY(-2px);box-shadow:0 10px 18px #0006}
+.tc.on b{color:var(--gold)}
+.colorPick{display:flex;gap:8px}
+.pc.rnd{font-size:26px;font-weight:800;color:var(--gold)}
+.side{flex:1;background:var(--card2);border:1px solid var(--line2);border-radius:16px;padding:14px 10px;display:flex;align-items:center;gap:12px;cursor:pointer;color:var(--muted)}
+.side .pc{width:46px;height:46px;border-radius:12px;background:#0E1318;display:flex;align-items:center;justify-content:center;border:1px solid var(--line)}
+.side .pc svg{width:36px;height:36px}
+.side.on{border-color:var(--gold);background:#242012;transform:translateY(-2px)}
+.side.on small{color:var(--gold)}
+.side small{display:block;font-size:11px;margin-top:2px}
+.side b{font-size:14px}
+/* ===== game ===== */
+#s-game{overflow:hidden;min-height:0}
+.game-head{display:flex;flex-direction:column;gap:8px;padding:8px 14px 0;flex:0 0 auto}
+.game-topline{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:1px 2px 0}
+.game-topline .status{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted);letter-spacing:.1px;font-weight:600;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#gameStatus{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+/* profile & pgn */
+.pgn-item{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.pgn-item b{font-size:13px}
+.pgn-item small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.pgn-item .btn-link{margin-left:auto;flex:0 0 auto}
+.btn-link:disabled{opacity:.45;cursor:not-allowed}
+#replayBar .a-btn{flex:1;padding:9px 6px}
+.game-topline .status b{color:var(--text);font-weight:800}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 0 #3DDC9766;animation:pl 1.6s infinite}
+.fs-btn{display:flex;align-items:center;gap:6px;background:#161C24;border:1px solid var(--line2);color:#C9D2DE;border-radius:10px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer;transition:.15s}
+.fs-btn:hover{border-color:var(--gold2);color:var(--gold)}
+/* ===== professional player cards ===== */
+/* ===== player card minimalista (flexbox, sin solapes) ===== */
+.pcard{position:relative;display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:14px;background:#141A22;border:1px solid #232C38;box-shadow:inset 0 1px 0 #FFFFFF0A;overflow:hidden;transition:border-color .18s,box-shadow .18s}
+.pcard>*{min-width:0}
+.pcard:before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:0 3px 3px 0;background:#2B3542;transition:background .18s}
+.pcard.active{border-color:#3E4856;box-shadow:0 10px 26px -10px #000,inset 0 1px 0 #FFFFFF12}
+.pcard.active:before{background:linear-gradient(180deg,#F3D478,#DFA93C);box-shadow:0 0 12px #E2B94E66}
+.pav{position:relative;width:42px;height:42px;flex:0 0 42px;border-radius:50%;padding:2px;background:conic-gradient(from 140deg,#3B4756,#222B36,#3B4756)}
+.pav .in{width:100%;height:100%;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;color:#EAF0F7;background:linear-gradient(145deg,#2A3543,#151B24)}
+.pcard.rival{cursor:pointer}
+.pcard.rival:hover{border-color:#3A4452;background:#171E27}
+.pcard.you .pav{background:conic-gradient(from 140deg,#3DDC97,#1B7A55,#3DDC97)}
+.pcard.you .pav .in{color:#3DDC97}
+.pcard.rival .pav{background:conic-gradient(from 140deg,#FF8A8A,#8A2E2E,#FF8A8A)}
+.pcard.rival .pav .in{color:#FF9B9B}
+.pav .dot-on{position:absolute;right:0;bottom:0;width:10px;height:10px;border-radius:50%;background:var(--green);border:2px solid #12171F}
+.pinfo{min-width:0;display:flex;flex-direction:column;gap:3px;flex:1 1 auto;overflow:hidden}
+.pname{display:flex;align-items:center;gap:6px;font-size:14px;font-weight:750;letter-spacing:-.1px;color:var(--text);min-width:0}
+.pname .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto}
+.pbadge{font-size:8px;font-weight:800;letter-spacing:.6px;color:#8FD3FF;background:#122033;border:1px solid #1E3A54;border-radius:4px;padding:1px 5px;flex:0 0 auto;white-space:nowrap}
+.pbadge.you{color:#9BE3BD;background:#12241B;border-color:#1E3B2B}
+.pmeta{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--muted);font-weight:600;white-space:nowrap;min-width:0;overflow:hidden}
+.pmeta>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.pmeta .sep{width:3px;height:3px;border-radius:50%;background:#49525F;flex:0 0 auto}
+.pmeta .live{color:var(--green)}
+.ptime{flex:0 0 auto;display:flex;flex-direction:column;gap:4px;align-items:stretch;width:82px}
+.clock{font-variant-numeric:tabular-nums;font-size:17px;font-weight:800;letter-spacing:.5px;color:#DCE3EC;background:#0B1016;border:1px solid #2A3341;padding:5px 6px;border-radius:9px;width:100%;text-align:center;box-shadow:inset 0 1px 3px #0008;transition:.18s}
+.pcard.active .clock{color:#06231A;background:linear-gradient(180deg,#7AF0BC,#3DDC97);border-color:#2FA37E;box-shadow:0 6px 16px -6px #3DDC9788}
+.clock.low{color:#FF9B9B;border-color:#4A2626;animation:blink 1s steps(2) infinite}
+.pcard.active .clock.low{background:linear-gradient(180deg,#FF9B9B,#E25C5C);color:#1A0808;border-color:#8A2E2E}
+@keyframes blink{50%{opacity:.5}}
+.timebar{width:100%;height:3px;border-radius:2px;background:#202834;overflow:hidden}
+.timebar i{display:block;height:100%;background:linear-gradient(90deg,#3DDC97,#7AF0BC);border-radius:2px;transition:width .3s linear}
+.pcard.active .timebar i{background:linear-gradient(90deg,#3DDC97,#7AF0BC)}
+/* ===== board ===== */
+.board-stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px 12px 4px}
+.board-frame{position:relative;flex:0 0 auto;width:100%;height:100%;padding:9px;border-radius:18px;background:linear-gradient(145deg,#3B2C1D 0%,#1E160E 48%,#2B2014 100%);border:1px solid #4C3A25;box-shadow:0 26px 50px -16px #000,inset 0 1px 0 #FFFFFF1A,inset 0 -1px 0 #000000A0}
+.board-frame:before{content:"";position:absolute;inset:5px;border-radius:13px;border:1px solid #00000066;pointer-events:none;z-index:2}
+.board{width:100%;height:100%;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border-radius:9px;overflow:hidden;box-shadow:inset 0 0 0 1px #00000055}
+.sq{display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;user-select:none;line-height:1}
+.sq.light{background:linear-gradient(150deg,#F0D9B5 0%,#EAD2AC 100%)}
+.sq.dark{background:linear-gradient(150deg,#B58863 0%,#A97A55 100%)}
+.sq img{width:88%;height:88%;pointer-events:none;position:relative;z-index:3;filter:drop-shadow(0 4px 3px #0007) drop-shadow(0 1px 0 #0004)}
+.sq.last:before{content:"";position:absolute;inset:0;background:#F6C44522;pointer-events:none;z-index:1}
+.sq.sel:before{content:"";position:absolute;inset:0;background:#F6C44518;pointer-events:none;z-index:1}
+.sq.sel{box-shadow:inset 0 0 0 3px #F6C445;z-index:2}
+.dot{position:absolute;width:17%;height:17%;border-radius:50%;background:#14141433;left:41.5%;top:41.5%;pointer-events:none;box-shadow:inset 0 1px 2px #0004;z-index:2}
+.capring{position:absolute;inset:6%;border-radius:50%;border:4px solid #1414142E;pointer-events:none;z-index:2}
+.sq.check{background:#FF4B4B66;box-shadow:inset 0 0 0 3px #FF4B4BCC}
+.sq.check img{z-index:3}
+.sq.err{box-shadow:inset 0 0 0 3px #FF6B6B}
+.sq.err:after{content:"";position:absolute;inset:0;background:#FF3B3B2E;pointer-events:none;z-index:1}
+.sq.locked{cursor:default}
+.coord{position:absolute;font-size:9px;font-weight:800;opacity:.55;pointer-events:none;letter-spacing:0}
+.sq.light .coord{color:#7A5636}.sq.dark .coord{color:#F0D9B5}
+
+/* dark board theme */
+body.dark-board .board-frame{background:linear-gradient(145deg,#1F2937 0%,#111827 48%,#1A2332 100%);border-color:#374151}
+body.dark-board .sq.light{background:linear-gradient(150deg,#8E9AAF 0%,#8494A3 100%)}
+body.dark-board .sq.dark{background:linear-gradient(150deg,#4A5568 0%,#42506A 100%)}
+body.dark-board .sq.light .coord{color:#2F3B4E}body.dark-board .sq.dark .coord{color:#CBD5E1}
+body.dark-board .dot{background:#FFFFFF44!important}
+body.dark-board .capring{border-color:#FFFFFF33!important}
+.c-r{left:4px;top:3px}.c-f{right:4px;bottom:3px}
+/* ===== game footer ===== */
+.game-foot{flex:0 0 auto;display:flex;flex-direction:column;gap:8px;padding:6px 14px 8px}
+.actions{display:flex;gap:7px}
+.a-btn{flex:1;border:1px solid var(--line2);background:var(--card);color:var(--text);border-radius:12px;padding:10px 6px;font-size:12px;font-weight:700;cursor:pointer;letter-spacing:.2px;transition:.15s}
+.a-btn:hover{border-color:#465264}
+.a-btn.warn:hover{border-color:#4A2626;color:#FF9B9B}
+.a-btn.gold{color:var(--gold);border-color:#3A3120;background:#1D1A10}
+.a-btn.ghost{display:none}
+/* ===== fullscreen ===== */
+.fs-hud{display:none}
+body.fs{padding:6px}
+body.fs .statusbar,body.fs .nav{display:none}
+body.fs .phone{padding:6px;border-radius:34px}
+body.fs .screen{height:calc(100dvh - 26px);min-height:0;border-radius:30px}
+body.fs .game-head,body.fs .game-foot .pcard{display:none}
+body.fs .game-foot{padding:4px 12px 8px}
+body.fs .a-btn{padding:9px 6px}
+body.fs .a-btn.ghost{display:block}
+body.fs #s-game .actions .a-btn.gold{display:none}
+body.fs .fs-hud{display:grid;grid-template-columns:1fr auto auto auto 1fr auto;align-items:center;gap:8px;padding:9px 12px 5px;flex:0 0 auto}
+body.fs .board-stage{padding:4px 10px 2px}
+body.fs #s-game .actions .a-btn.ghost{display:none}
+.fs-exit{width:32px;height:32px;border-radius:9px;background:#161C24;border:1px solid #2A3341;color:#C9D2DE;font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;flex:0 0 auto}
+.fs-exit:hover{border-color:var(--gold2);color:var(--gold)}
+.fs-side{display:flex;align-items:center;gap:6px;min-width:0;font-size:12px;font-weight:750;color:var(--text)}
+.fs-side span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fs-side.you{justify-self:end;flex-direction:row-reverse}
+.fs-side.rival{justify-self:start}
+.fs-dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+.fs-dot.rival{background:#FF8A8A}.fs-dot.you{background:var(--green)}
+.fs-clock{font-variant-numeric:tabular-nums;font-size:18px;font-weight:800;letter-spacing:.4px;background:#0B1016;border:1px solid #2A3341;border-radius:9px;padding:4px 9px;color:#DCE3EC;min-width:68px;text-align:center}
+.fs-clock.active{background:linear-gradient(180deg,#7AF0BC,#3DDC97);color:#06231A;border-color:#2FA37E}
+.fs-clock.low{color:#FF9B9B;border-color:#4A2626}
+.fs-clock.active.low{background:linear-gradient(180deg,#FF9B9B,#E25C5C);color:#1A0808;border-color:#8A2E2E}
+.fs-vs{font-size:9px;color:var(--muted);font-weight:800;letter-spacing:.5px}
+/* ===== nav ===== */
+.nav{flex:0 0 auto;display:flex;gap:4px;padding:9px 10px;border-top:1px solid var(--line);background:#10141A;border-radius:0 0 34px 34px}
+.nav button{flex:1;background:none;border:0;color:var(--muted);padding:8px 4px;border-radius:12px;cursor:pointer;font-size:10.5px;display:flex;flex-direction:column;align-items:center;gap:4px;font-weight:600;letter-spacing:.3px;transition:.15s}
+.nav button svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.nav button.on{background:#1C232D;color:var(--gold)}
+.btn-back{align-self:flex-start;background:var(--card);border:1px solid var(--line);color:var(--text);cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:10px;transition:.15s}
+.btn-back:hover{border-color:var(--gold2);color:var(--gold)}
+/* dialog — always centered, same place */
+.modal-back{position:absolute;inset:0;background:#000B;backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:50;border-radius:34px}
+.modal-back.show{display:flex}
+.modal{background:var(--card);border:1px solid #3A3120;border-radius:22px;padding:20px;max-width:320px;width:88%;box-shadow:0 30px 60px #000D;text-align:center}
+.modal h3{font-size:17px;letter-spacing:-.2px;color:var(--text)}
+.modal p{color:var(--muted);font-size:13px;margin-top:8px;line-height:1.5}
+.modal .row{display:flex;gap:10px;margin-top:18px}
+.modal .row button{flex:1;border:0;border-radius:13px;padding:12px 6px;font-weight:700;cursor:pointer;font-size:13px}
+.modal .primary{background:var(--gold);color:#141414}
+.modal .danger{background:#3A2222;color:#FF9B9B}
+.modal .ghost{background:var(--card2);color:var(--text);border:1px solid var(--line2)}
+.modal .chips{display:flex;gap:8px;justify-content:center;margin-top:14px}
+.modal .promo{display:flex;flex-direction:column;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--line2);border-radius:14px;padding:10px 8px;cursor:pointer}
+.modal .promo svg{width:38px;height:38px}
+.modal .promo span{font-size:10.5px;color:var(--muted);font-weight:600}
+.toast{position:absolute;left:14px;right:14px;bottom:78px;background:#1F2937F2;border:1px solid var(--line2);border-radius:14px;padding:12px 14px;font-size:13px;transform:translateY(12px);opacity:0;transition:all .25s;pointer-events:none;z-index:5}
+.toast.show{transform:none;opacity:1}
+::-webkit-scrollbar{width:0;height:0}
+/* settings screen */
+.field{margin:10px 0 2px}
+/* ===== settings: secciones ===== */
+.sec{margin-top:14px;border:1px solid var(--line);border-radius:16px;background:#111820;overflow:hidden}
+.sec-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 13px;background:#151D26;border-bottom:1px solid var(--line)}
+.sec-h b{font-size:11px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:#C3CBD7}
+.sec-h small{font-size:10px;color:var(--muted);font-weight:600;text-align:right}
+.sec-b{padding:11px 13px;display:flex;flex-direction:column;gap:9px}
+.sec-b>.row-card,.sec-b>.btn-flat,.sec-b>.chiprow,.sec-b>.stepper,.sec-b>.volrow{margin-top:0}
+.sec-b .row-card{background:#151C25;border-color:#222B36}
+.sec-b .btn-flat{background:#151C25;border-color:#222B36}
+.sec-b .chiprow{margin-top:0}
+.sec-b .stepper{background:#151C25;border-color:#222B36}
+.sec-b .volrow{margin-top:0}
+.sec-lbl{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.3px}
+.sec-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.sec-row>span{font-size:11px;color:var(--muted);font-weight:600}
+/* ===== dispositivos ===== */
+.dev-row{display:flex;align-items:center;gap:11px;width:100%;padding:10px 12px;border-radius:14px;background:var(--card);border:1px solid var(--line);color:var(--text);font-family:inherit;text-align:left;cursor:pointer}
+.dev-row:hover{border-color:#3A3524}
+.dev-ic{width:42px;height:42px;flex:0 0 42px;border-radius:11px;background:#1A2433;border:1px solid #24324A;color:#5B9DF9;font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.dev-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.dev-info b{font-size:13px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dev-info small{font-size:10px;color:var(--muted)}
+.dev-join{flex:0 0 auto;font-size:11.5px;font-weight:800;color:#E2B94E;background:#0F0F0F;border:1px solid #3A3524;border-radius:10px;padding:8px 13px}
+.dev-wait{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--muted)}
+.btn-flat{display:flex;width:100%;background:var(--card);border:1px solid var(--line);border-radius:15px;padding:13px 15px;color:var(--text);font-family:inherit;cursor:pointer;gap:12px;align-items:center;font-size:13.5px;font-weight:600}
+.btn-flat small{display:block;font-weight:400;font-size:11px;color:var(--muted);margin-top:2px}
+.btn-flat .lbl{flex:1;text-align:left}
+.chiprow{display:flex;gap:8px;margin-top:8px}
+.chip{flex:1;background:var(--card);border:1px solid var(--line2);border-radius:12px;padding:10px 4px;color:var(--text);font-family:inherit;cursor:pointer;font-size:12px;font-weight:700}
+.chip.on{background:#26200F;border-color:var(--gold);color:var(--gold)}
+.stepper{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.stepper b{flex:1;text-align:left;font-size:12.5px}
+.stepper .st-btn{width:30px;height:30px;border-radius:9px;border:1px solid var(--line2);background:var(--card2);color:var(--text);font-weight:800;cursor:pointer;font-size:15px;font-family:inherit}
+.stepper .st-val{min-width:34px;text-align:center;font-weight:800;font-size:15px}
+.volrow{display:flex;align-items:center;gap:10px;margin-top:10px}
+.volrow input[type=range]{flex:1;accent-color:var(--gold)}
+</style></head>
+<body>
+<div class="phone">
+  <div class="screen">
+
+    <div class="statusbar">
+      <span>21:07</span>
+      <div class="icons">
+        <svg width="17" height="12" viewBox="0 0 17 12" fill="currentColor"><rect x="0" y="7" width="3" height="4" rx="1"/><rect x="4.5" y="5" width="3" height="6" rx="1"/><rect x="9" y="3" width="3" height="8" rx="1"/><rect x="13.5" y="0" width="3" height="11" rx="1"/></svg>
+        <svg width="20" height="12" viewBox="0 0 20 12" fill="currentColor"><path d="M10 11.5a1.8 1.8 0 1 0 0.001-3.601A1.8 1.8 0 0 0 10 11.5zM4.2 6.9l1.7 1.6a6 6 0 0 1 8.2 0l1.7-1.7a8.4 8.4 0 0 0-11.6 0zM0 3l1.7 1.6a11.6 11.6 0 0 1 16.6 0L20 3A14 14 0 0 0 0 3z"/></svg>
+        <svg width="25" height="12" viewBox="0 0 25 12" fill="none" stroke="currentColor" stroke-width="1"><rect x="0.5" y="0.5" width="20" height="11" rx="3"/><rect x="2.5" y="2.5" width="13" height="7" rx="1.5" fill="currentColor" stroke="none"/><rect x="23" y="3.5" width="1.6" height="5" rx="1" fill="currentColor" stroke="none"/></svg>
+      </div>
+    </div>
+
+    <!-- HOME -->
+    <div class="sc on" id="s-home">
+      <div class="content">
+        <div class="topbar">
+          <div class="brand">
+            <canvas id="logoCanvas" class="logo" width="100" height="100" style="width:50px;height:50px"></canvas>
+            <div><h1>CHESS-X</h1></div>
+          </div>
+          <span class="spp"><span class="pulse"></span>SPP</span>
+        </div>
+
+        <div class="home-cta">
+          <button class="cx-btn" id="createBtn" onclick="go('connect');mode='host';syncMode()">
+            <b>Crear partida</b><span id="createSub">Anfitrión · decide reloj y color</span>
+          </button>
+          <button class="cx-btn" id="joinBtn" onclick="go('connect');mode='guest';syncMode()">
+            <b>Unirse a partida</b><span>Busca rivales cercanos</span>
+          </button>
+          <div id="sessionNote" class="session-note" style="display:none"></div>
+        </div>
+
+        <p class="dev-sign">CHESS-X · © Elal Chico</p>
+
+        <div class="row-card" style="margin-top:auto">
+          <div><b>Sonidos</b><small>Conjunto estándar de ajedrez</small></div>
+          <div class="switch on" id="soundSw" onclick="toggleSound(this)"></div>
+        </div>
+      </div>
+      <div class="toast" id="toastHome">Sonidos activados</div>
+    </div>
+
+    <!-- CONNECT -->
+    <div class="sc" id="s-connect">
+      <div class="content">
+        <button class="btn-back" onclick="go('home')">← Volver al inicio</button>
+        <div class="topbar" style="margin-top:2px">
+          <h2 id="connTitle">Crear partida</h2>
+          <span class="spp" id="myNameChip">YO · —</span>
+        </div>
+        <p class="muted" id="connDesc">Pulsa «Escuchar» y espera a que el rival se conecte.</p>
+
+        <div id="rivalPanel" style="display:none;flex-direction:column;gap:10px">
+          <button class="cx-btn" id="rivalProfileBtn" onclick="openRivalProfile()">
+            <b id="rivalProfileLabel">Ver perfil de rival</b>
+            <span id="rivalProfileMeta">—</span>
+          </button>
+          <button class="cx-btn" style="border-color:#24231C" onclick="go('home')"><b>Regresar al inicio</b></button>
+        </div>
+
+        <button class="cx-btn" id="listenBtn" onclick="startListen()"><b>Escuchar conexiones</b><span>Visible por Bluetooth · 300s</span></button>
+        <button class="cx-btn" id="scanBtn" onclick="doScan()"><b>Buscar rivales</b><span>Escaneo activo · mantén el otro móvil cerca</span></button>
+        <div id="deviceBox" style="display:flex;flex-direction:column;gap:10px;margin-top:4px"></div>
+      </div>
+      <div class="toast" id="toastConnect"></div>
+    </div>
+
+    <!-- LOBBY -->
+    <div class="sc" id="s-lobby">
+      <div class="content">
+        <button class="btn-back" onclick="go('home')">← Volver al inicio</button>
+        <div class="topbar"><h2>Perfil</h2><span class="spp" id="lobbyConnPill"><span class="pulse"></span>Conectado</span></div>
+        <div id="lobbyRivalPanel" style="display:none">
+          <button class="cx-btn" id="lobbyRivalBtn" onclick="openRivalProfile()"><b id="lobbyRivalLabel">Ver perfil de rival</b><span id="lobbyRivalMeta">—</span></button>
+        </div>
+        <p class="muted" id="lobbyHint">Configura tu perfil. El anfitrión elige reloj y color.</p>
+        <div class="field"><label>FOTO DE PERFIL</label>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:8px">
+            <div style="width:58px;height:58px;flex:0 0 58px;border-radius:50%;background:linear-gradient(145deg,#2A3543,#151B24);border:1px solid #26303C;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800;color:#EAF0F7;overflow:hidden">
+              <img id="profImg" style="display:none;width:100%;height:100%;object-fit:cover"/>
+              <span id="profInit">T</span>
+            </div>
+            <div style="flex:1;min-width:0">
+              <button class="btn-flat" style="padding:9px 12px" onclick="document.getElementById('photoFile').click()">Cambiar foto<small>Foto visible para el rival si está activado</small></button>
+              <input type="file" id="photoFile" accept="image/*" style="display:none" onchange="setPhoto(this)"/>
+              <p style="font-size:11px;color:var(--muted);margin-top:6px">Foto compartida: <b id="sharePhotoState" style="color:var(--green)">Compartida</b></p>
+            </div>
+          </div>
+        </div>
+        <div class="field"><label>TU NOMBRE</label>
+          <div style="display:flex;gap:8px">
+            <input id="nameIn" maxlength="18" style="flex:1" placeholder="Introduce tu nombre (se puede editar)"/>
+            <button class="btn-link" onclick="saveName()" style="flex:0 0 auto">Guardar</button>
+          </div>
+          <p style="font-size:11px;color:var(--muted);margin-top:6px">Se guarda de forma permanente en tu perfil. Si lo dejas vacío, se asigna un ID aleatorio.</p>
+        </div>
+        <div class="field"><label>COLOR</label>
+          <div class="colorPick">
+            <div class="side on" id="sideW" onclick="pickSide('w')"><div class="pc" id="pcKW"></div><div><b>Blancas</b><small>Mueven primero</small></div></div>
+            <div class="side" id="sideB" onclick="pickSide('b')"><div class="pc" id="pcKB"></div><div><b>Negras</b><small>Juegan segundo</small></div></div>
+            <div class="side" id="sideR" onclick="pickSide('r')"><div class="pc rnd">?</div><div><b>Aleatorio</b><small>Se decide al comenzar</small></div></div>
+          </div>
+        </div>
+        <div class="field"><label>ESTADÍSTICAS</label>
+          <div class="stats" id="statsBox" style="margin-top:8px"></div>
+        </div>
+        <div class="field"><label>CONTROL DE TIEMPO ACTUAL</label>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+            <span class="spp" style="background:#1C1E12;border-color:#3A3A1E;color:#E2B94E" id="tcCur">5 + 0</span>
+            <span style="font-size:11px;color:var(--muted)">Se cambia en Ajustes (reloj)</span>
+          </div>
+        </div>
+        <button class="cx-btn" id="startBtn" onclick="startGame()" style="margin-top:2px;border-color:#3A3524"><b>Comenzar partida</b><span>Sólo el anfitrión puede iniciar</span></button>
+        <div id="guestWait" style="display:none;flex-direction:row;align-items:center;gap:11px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;color:var(--text);font-size:13px;font-weight:600"><span class="pulse" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--gold)"></span>Esperando a que el anfitrión inicie…</div>
+        <div class="field" style="margin-top:12px"><label>MIS PARTIDAS (PGN)</label>
+          <div id="pgnBox" style="display:flex;flex-direction:column;gap:8px;margin-top:8px"></div>
+        </div>
+      </div>
+      <div class="toast" id="toastLobby"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="sc" id="s-settings">
+      <div class="content">
+        <button class="btn-back" onclick="go('home')">← Volver al inicio</button>
+        <h2>Ajustes</h2>
+        <p class="muted">Configura la app. Todo se guarda al instante.</p>
+
+        <!-- ============ IDIOMA ============ -->
+        <div class="sec">
+          <div class="sec-h"><b>Idioma</b><small>ES / EN</small></div>
+          <div class="sec-b">
+            <div class="chiprow">
+              <button class="chip on" id="langEsBtn" onclick="setLang('es')">Español</button>
+              <button class="chip" id="langEnBtn" onclick="setLang('en')">English</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ TABLERO ============ -->
+        <div class="sec">
+          <div class="sec-h"><b>Tablero</b><small>Tema y ayudas visuales</small></div>
+          <div class="sec-b">
+            <span class="sec-lbl">TEMA</span>
+            <div class="chiprow">
+              <button class="chip on" id="thClassicBtn" onclick="setBoardTheme('classic')">Clásico</button>
+              <button class="chip" id="thDarkBtn" onclick="setBoardTheme('dark')">Oscuro</button>
+            </div>
+            <div class="row-card"><div><b>Indicadores de movimiento</b><small>Puntos y anillos de jugadas legales</small></div><div class="switch on" id="moveIndSw" onclick="toggleMoveInd(this)"></div></div>
+            <div class="row-card"><div><b>Señal de jaque</b><small>Rey en rojo · solo en jaque o mate</small></div><div class="switch on" id="checkSw" onclick="toggleCheckSig(this)"></div></div>
+          </div>
+        </div>
+
+        <!-- ============ SONIDOS ============ -->
+        <div class="sec">
+          <div class="sec-h"><b>Sonidos</b><small>Sonidos estándar</small></div>
+          <div class="sec-b">
+            <div class="row-card"><div><b>Sonidos activados</b><small>Movimientos, capturas, jaque y mate</small></div><div class="switch on" id="soundSw2" onclick="toggleSound(this)"></div></div>
+            <div class="volrow" id="volRow">
+              <span style="font-size:11px;color:var(--muted);font-weight:700">VOL</span>
+              <input type="range" min="0" max="100" value="80" id="volSlider" oninput="setVolume(this.value)"/>
+              <b id="volLabel" style="font-size:12px;color:var(--gold);min-width:38px;text-align:right">80%</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- ============ RELOJ ============ -->
+        <div class="sec">
+          <div class="sec-h"><b>Reloj por defecto</b><small>Se usa al crear sala</small></div>
+          <div class="sec-b">
+            <div class="stepper"><b>Minutos</b>
+              <button class="st-btn" onclick="stTime(-1)">−</button><span class="st-val" id="stMin">5</span><button class="st-btn" onclick="stTime(1)">+</button>
+            </div>
+            <div class="stepper"><b>Incremento (seg)</b>
+              <button class="st-btn" onclick="stInc(-1)">−</button><span class="st-val" id="stInc">0</span><button class="st-btn" onclick="stInc(1)">+</button>
+            </div>
+            <span class="sec-lbl">1–120 min · 0–30 s de incremento</span>
+          </div>
+        </div>
+
+        <!-- ============ PRIVACIDAD ============ -->
+        <div class="sec">
+          <div class="sec-h"><b>Compartir con el rival</b><small>Tu rival sólo ve lo activado aquí</small></div>
+          <div class="sec-b">
+            <div class="row-card"><div><b>Foto de perfil</b><small>Tu rival verá tu avatar</small></div><div class="switch on" id="priPhoto" onclick="priToggle(this,'photo')"></div></div>
+            <div class="row-card"><div><b>Historial</b><small>Partidas recientes y resultados</small></div><div class="switch on" id="priHist" onclick="priToggle(this,'history')"></div></div>
+            <div class="row-card"><div><b>PGN</b><small>Permitir reproducir tus partidas</small></div><div class="switch on" id="priPgn" onclick="priToggle(this,'pgn')"></div></div>
+          </div>
+        </div>
+
+        <!-- ============ CONEXIÓN ============ -->
+        <div class="sec">
+          <div class="sec-h"><b>Conexión Bluetooth</b><small>Desvincular y permisos</small></div>
+          <div class="sec-b">
+            <button class="btn-flat" onclick="showModal('Liberar conexión','La app libera su enlace SPP. Para desvincular/apagar todos los dispositivos, ve a Ajustes del sistema > Bluetooth (Android no permite apagar BT a otras apps).',[{t:'Entendido',cls:'primary'}])"><span class="lbl">Liberar conexión<small>Cierra el socket Bluetooth de esta app</small></span><span style="color:var(--gold);font-weight:800">→</span></button>
+            <button class="btn-flat" onclick="showModal('Ajustes BT del sistema','En tu móvil: Ajustes > Bluetooth. Allí puedes emparejar, desvincular o apagar el Bluetooth del sistema.',[{t:'Entendido',cls:'primary'}])"><span class="lbl">Ajustes BT del sistema<small>Desvincula o apaga el Bluetooth de Android</small></span><span style="color:var(--gold);font-weight:800">→</span></button>
+          </div>
+        </div>
+
+        <!-- ============ APLICACIÓN ============ -->
+        <div class="sec">
+          <div class="sec-h"><b>Aplicación</b><small>CHESS-X</small></div>
+          <div class="sec-b">
+            <button class="btn-flat" style="color:#FF9B9B;border-color:#4A2626" onclick="showModal('Salir de CHESS-X','¿Deseas cerrar CHESS-X?',[{t:'Cancelar',cls:'ghost'},{t:'Salir',cls:'danger',fn:closeApp}])"><span class="lbl">Cerrar aplicación<small>Termina la sesión y cierra CHESS-X</small></span><span style="color:#FF9B9B;font-weight:800">→</span></button>
+            <p style="font-size:10.5px;color:var(--muted);text-align:center;line-height:1.5">CHESS-X · Motor FIDE propio · conexión SPP segura</p>
+          </div>
+        </div>
+      </div>
+      <div class="toast" id="toastSettings"></div>
+    </div>
+
+    <!-- GAME -->
+    <div class="sc" id="s-game">
+      <div class="game-head">
+        <div class="game-topline">
+          <div class="status"><span class="live-dot"></span><span id="gameStatus"><b>Blancas</b> a mover</span></div>
+          <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()">Pantalla completa</button>
+        </div>
+        <div class="pcard rival" id="rivalCard" onclick="openRivalProfile()" title="Ver perfil del rival">
+          <div class="pav"><div class="in" id="rivAvatar">R</div><span class="dot-on"></span></div>
+          <div class="pinfo">
+            <div class="pname"><span class="nm" id="rivName">Rival</span><span class="pbadge" id="rivBadge">NEGRAS</span></div>
+            <div class="pmeta"><span id="rivState">En espera</span></div>
+          </div>
+          <div class="ptime">
+            <div class="clock" id="rivClock">5:00</div>
+            <div class="timebar"><i id="rivBar" style="width:100%"></i></div>
+          </div>
+        </div>
+      </div>
+      <div class="fs-hud">
+        <div class="fs-side rival"><span class="fs-dot rival"></span><span>Rival</span></div>
+        <div class="fs-clock" id="fsRivClock">5:00</div>
+        <div class="fs-vs">VS</div>
+        <div class="fs-clock" id="fsYouClock">5:00</div>
+        <div class="fs-side you"><span>Tú</span><span class="fs-dot you"></span></div>
+        <button class="fs-exit" onclick="toggleFullscreen()" title="Salir de pantalla completa">X</button>
+      </div>
+      <div class="board-stage">
+        <div class="board-frame">
+          <div class="board" id="board"></div>
+        </div>
+      </div>
+      <div class="game-foot">
+        <div id="replayBar" style="display:none;gap:8px;align-items:center">
+          <button class="a-btn" onclick="rpStep(-1)">← Anterior</button>
+          <span id="rpPos" style="flex:1;text-align:center;font-size:12px;color:var(--muted);white-space:nowrap">0/0</span>
+          <button class="a-btn" onclick="rpStep(1)">Siguiente →</button>
+          <button class="a-btn warn" onclick="exitReplay()">Salir</button>
+        </div>
+        <div class="pcard you" id="youCard">
+          <div class="pav"><div class="in" id="youAvatar">T</div><span class="dot-on"></span></div>
+          <div class="pinfo">
+            <div class="pname"><span class="nm" id="youName">Tú</span><span class="pbadge you" id="youBadge">BLANCAS</span></div>
+            <div class="pmeta"><span id="youState">Tu turno</span></div>
+          </div>
+          <div class="ptime">
+            <div class="clock" id="youClock">5:00</div>
+            <div class="timebar"><i id="youBar" style="width:100%"></i></div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="a-btn warn" id="pauseBtn" onclick="act('pause')">Pausar</button>
+          <button class="a-btn gold" onclick="act('draw')">Tablas</button>
+          <button class="a-btn warn" onclick="act('resign')">Abandonar</button>
+        </div>
+      </div>
+      <div class="toast" id="toastGame" style="bottom:96px"></div>
+    </div>
+
+    <nav class="nav">
+      <button class="on" data-s="home" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a2 2 0 0 1-2 2h-4v-5h-4v5H6a2 2 0 0 1-2-2z"/></svg>Inicio</button>
+      <button data-s="connect" onclick="go('connect');mode='host';syncMode()"><svg viewBox="0 0 24 24"><path d="M4 12a8.5 8.5 0 0 1 16 0M7.5 15.5a5 5 0 0 1 9 0M12 19h.01"/></svg>Conectar</button>
+      <button data-s="lobby" onclick="go('lobby')"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 11l3 3 4.5-5"/></svg>Perfil</button>
+      <button data-s="game" onclick="go('game')"><svg viewBox="0 0 24 24"><path d="M6 4h12v4a7 7 0 0 1-14 0z" transform="translate(0 .5)"/><path d="M9 20h6M10 20v-2h4v2"/></svg>Partida</button>
+      <button data-s="settings" onclick="go('settings')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>Ajustes</button>
+    </nav>
+  </div>
+</div>
+
+<div class="modal-back" id="modalBack"><div class="modal"><h3 id="modalT"></h3><p id="modalB" style="display:none"></p><div class="chips" id="modalChips" style="display:none"></div><div class="row" id="modalBtns"></div></div></div>
+
+<!-- Recorte de foto de perfil: círculo perfecto + arrastrar + zoom -->
+<div class="modal-back" id="cropBack">
+  <div class="modal" style="max-width:300px">
+    <h3>Foto de perfil</h3>
+    <p style="margin-bottom:12px">Arrastra para encuadrar la foto</p>
+    <div id="cropView" style="position:relative;width:220px;height:220px;margin:14px auto;border-radius:50%;overflow:hidden;touch-action:none;cursor:grab;border:2px solid #26303C;box-shadow:0 10px 24px #0008;background:#151B24">
+      <img id="cropImg" style="position:absolute;max-width:none;user-select:none;-webkit-user-drag:none;pointer-events:none;display:none"/>
+    </div>
+    <div class="row">
+      <button class="ghost" onclick="closeCrop()">Cancelar</button>
+      <button class="primary" onclick="confirmCrop()">Usar foto</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== piezas Lichess cburnett embebidas (autocontenido) ===== */
+const P={
+WK:'<svg viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path stroke-linejoin="miter" d="M22.5 11.63V6M20 8h5"/><path fill="#fff" stroke-linecap="butt" stroke-linejoin="miter" d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5"/><path fill="#fff" d="M11.5 37c5.5 3.5 15.5 3.5 21 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-3.5-7.5-13-10.5-16-4-3 6 5 10 5 10z"/><path d="M11.5 30c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0"/></g></svg>',
+WQ:'<svg viewBox="0 0 45 45"><g fill="#fff" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M8 12a2 2 0 1 1-4 0 2 2 0 1 1 4 0m16.5-4.5a2 2 0 1 1-4 0 2 2 0 1 1 4 0M41 12a2 2 0 1 1-4 0 2 2 0 1 1 4 0M16 8.5a2 2 0 1 1-4 0 2 2 0 1 1 4 0M33 9a2 2 0 1 1-4 0 2 2 0 1 1 4 0"/><path stroke-linecap="butt" d="M9 26c8.5-1.5 21-1.5 27 0l2-12-7 11V11l-5.5 13.5-3-15-3 15-5.5-14V25L7 14z"/><path stroke-linecap="butt" d="M9 26c0 2 1.5 2 2.5 4 1 1.5 1 1 .5 3.5-1.5 1-1.5 2.5-1.5 2.5-1.5 1.5.5 2.5.5 2.5 6.5 1 16.5 1 23 0 0 0 1.5-1 0-2.5 0 0 .5-1.5-1-2.5-.5-2.5-.5-2 .5-3.5 1-2 2.5-2 2.5-4-8.5-1.5-18.5-1.5-27 0z"/><path fill="none" d="M11.5 30c3.5-1 18.5-1 22 0M12 33.5c6-1 15-1 21 0"/></g></svg>',
+WR:'<svg viewBox="0 0 45 45"><g fill="#fff" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path stroke-linecap="butt" d="M9 39h27v-3H9zm3-3v-4h21v4zm-1-22V9h4v2h5V9h5v2h5V9h4v5"/><path d="m34 14-3 3H14l-3-3"/><path stroke-linecap="butt" stroke-linejoin="miter" d="M31 17v12.5H14V17"/><path d="m31 29.5 1.5 2.5h-20l1.5-2.5"/><path fill="none" stroke-linejoin="miter" d="M11 14h23"/></g></svg>',
+WB:'<svg viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><g fill="#fff" stroke-linecap="butt"><path d="M9 36c3.39-.97 10.11.43 13.5-2 3.39 2.43 10.11 1.03 13.5 2 0 0 1.65.54 3 2-.68.97-1.65.99-3 .5-3.39-.97-10.11.46-13.5-1-3.39 1.46-10.11.03-13.5 1-1.35.49-2.32.47-3-.5 1.35-1.94 3-2 3-2z"/><path d="M15 32c2.5 2.5 12.5 2.5 15 0 .5-1.5 0-2 0-2 0-2.5-2.5-4-2.5-4 5.5-1.5 6-11.5-5-15.5-11 4-10.5 14-5 15.5 0 0-2.5 1.5-2.5 4 0 0-.5.5 0 2z"/><path d="M25 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0z"/></g><path stroke-linejoin="miter" d="M17.5 26h10M15 30h15m-7.5-14.5v5M20 18h5"/></g></svg>',
+WN:'<svg viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path fill="#fff" d="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21"/><path fill="#fff" d="M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.042-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4.003 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-.994-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-1.992 2.5-3c1 0 1 3 1 3"/><path fill="#000" d="M9.5 25.5a.5.5 0 1 1-1 0 .5.5 0 1 1 1 0m5.433-9.75a.5 1.5 30 1 1-.866-.5.5 1.5 30 1 1 .866.5"/></g></svg>',
+WP:'<svg viewBox="0 0 45 45"><path fill="#fff" stroke="#000" stroke-linecap="round" stroke-width="1.5" d="M22.5 9c-2.21 0-4 1.79-4 4 0 .89.29 1.71.78 2.38C17.33 16.5 16 18.59 16 21c0 2.03.94 3.84 2.41 5.03-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47 1.47-1.19 2.41-3 2.41-5.03 0-2.41-1.33-4.5-3.28-5.62.49-.67.78-1.49.78-2.38 0-2.21-1.79-4-4-4z"/></svg>',
+BK:'<svg viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path stroke-linejoin="miter" d="M22.5 11.6V6"/><path fill="#000" stroke-linecap="butt" stroke-linejoin="miter" d="M22.5 25s4.5-7.5 3-10.5c0 0-1-2.5-3-2.5s-3 2.5-3 2.5c-1.5 3 3 10.5 3 10.5"/><path fill="#000" d="M11.5 37a22.3 22.3 0 0 0 21 0v-7s9-4.5 6-10.5c-4-6.5-13.5-3.5-16 4V27v-3.5c-3.5-7.5-13-10.5-16-4-3 6 5 10 5 10z"/><path stroke-linejoin="miter" d="M20 8h5"/><path stroke="#ececec" d="M32 29.5s8.5-4 6-9.7C34.1 14 25 18 22.5 24.6v2.1-2.1C20 18 9.9 14 7 19.9c-2.5 5.6 4.8 9 4.8 9"/><path stroke="#ececec" d="M11.5 30c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0m-21 3.5c5.5-3 15.5-3 21 0"/></g></svg>',
+BQ:'<svg viewBox="0 0 45 45"><g fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><g stroke="none" fill="#000"><circle cx="6" cy="12" r="2.75"/><circle cx="14" cy="9" r="2.75"/><circle cx="22.5" cy="8" r="2.75"/><circle cx="31" cy="9" r="2.75"/><circle cx="39" cy="12" r="2.75"/></g><path fill="#000" stroke-linecap="butt" d="M9 26c8.5-1.5 21-1.5 27 0l2.5-12.5L31 25l-.3-14.1-5.2 13.6-3-14.5-3 14.5-5.2-13.6L14 25 6.5 13.5z"/><path fill="#000" stroke-linecap="butt" d="M9 26c0 2 1.5 2 2.5 4 1 1.5 1 1 .5 3.5-1.5 1-1.5 2.5-1.5 2.5-1.5 1.5.5 2.5.5 2.5 6.5 1 16.5 1 23 0 0 0 1.5-1 0-2.5 0 0 .5-1.5-1-2.5-.5-2.5-.5-2 .5-3.5 1-2 2.5-2 2.5-4-8.5-1.5-18.5-1.5-27 0z"/><path fill="none" stroke-linecap="butt" d="M11 38.5a35 35 1 0 0 23 0"/><path fill="none" stroke="#ececec" d="M11 29a35 35 1 0 1 23 0m-21.5 2.5h20m-21 3a35 35 1 0 0 22 0m-23 3a35 35 1 0 0 24 0"/></g></svg>',
+BR:'<svg viewBox="0 0 45 45"><g fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path fill="#000" stroke-linecap="butt" d="M9 39h27v-3H9zm3.5-7 1.5-2.5h17l1.5 2.5zm-.5 4v-4h21v4z"/><path fill="#000" stroke-linecap="butt" stroke-linejoin="miter" d="M14 29.5v-13h17v13z"/><path fill="#000" stroke-linecap="butt" d="M14 16.5 11 14h23l-3 2.5zM11 14V9h4v2h5V9h5v2h5V9h4v5z"/><path fill="none" stroke="#ececec" stroke-linejoin="miter" stroke-width="1" d="M12 35.5h21m-20-4h19m-18-2h17m-17-13h17M11 14h23"/></g></svg>',
+BB:'<svg viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><g fill="#000" stroke-linecap="butt"><path d="M9 36c3.4-1 10.1.4 13.5-2 3.4 2.4 10.1 1 13.5 2 0 0 1.6.5 3 2-.7 1-1.6 1-3 .5-3.4-1-10.1.5-13.5-1-3.4 1.5-10.1 0-13.5 1-1.4.5-2.3.5-3-.5 1.4-2 3-2 3-2z"/><path d="M15 32c2.5 2.5 12.5 2.5 15 0 .5-1.5 0-2 0-2 0-2.5-2.5-4-2.5-4 5.5-1.5 6-11.5-5-15.5-11 4-10.5 14-5 15.5 0 0-2.5 1.5-2.5 4 0 0-.5.5 0 2z"/><path d="M25 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0z"/></g><path stroke="#ececec" stroke-linejoin="miter" d="M17.5 26h10M15 30h15m-7.5-14.5v5M20 18h5"/></g></svg>',
+BN:'<svg viewBox="0 0 45 45"><g fill="none" fill-rule="evenodd" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path fill="#000" d="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21"/><path fill="#000" d="M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.04-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-1-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-2 2.5-3c1 0 1 3 1 3"/><path fill="#ececec" stroke="#ececec" d="M9.5 25.5a.5.5 0 1 1-1 0 .5.5 0 1 1 1 0m5.43-9.75a.5 1.5 30 1 1-.86-.5.5 1.5 30 1 1 .86.5"/><path fill="#ececec" stroke="none" d="m24.55 10.4-.45 1.45.5.15c3.15 1 5.65 2.49 7.9 6.75S35.75 29.06 35.25 39l-.05.5h2.25l.05-.5c.5-10.06-.88-16.85-3.25-21.34s-5.79-6.64-9.19-7.16z"/></g></svg>',
+BP:'<svg viewBox="0 0 45 45"><path fill="#000" stroke="#000" stroke-linecap="round" stroke-width="1.5" d="M22.5 9a4 4 0 0 0-3.22 6.38 6.48 6.48 0 0 0-.87 10.65c-3 1.06-7.41 5.55-7.41 13.47h23c0-7.92-4.41-12.41-7.41-13.47a6.46 6.46 0 0 0-.87-10.65A4.01 4.01 0 0 0 22.5 9z"/></svg>'};
+/* Las piezas se cargan como <img>: un SVG autonomous necesita xmlns propio,
+   de lo contrario el navegador lo parsea como XML y la imagen sale rota. */
+const SVG_NS='http://www.w3.org/2000/svg';
+function svgUri(svg){
+  let s=String(svg);
+  if(!/xmlns=/.test(s))s=s.replace('<svg','<svg xmlns="'+SVG_NS+'"');
+  return 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(s);
+}
+function pieceImg(svg,alt,size){
+  const img=document.createElement('img');
+  img.src=svgUri(svg); img.alt=alt||''; img.draggable=false;
+  if(size){img.style.width=size+'px';img.style.height=size+'px';}
+  return img;
+}
+document.getElementById('pcKW').appendChild(pieceImg(P.WK,'WK',38));
+document.getElementById('pcKB').appendChild(pieceImg(P.BK,'BK',38));
+
+/* ===== estado y navegación ===== */
+let mode='host'; let soundOn=true;
+function go(s){
+  document.querySelectorAll('.sc').forEach(e=>e.classList.toggle('on',e.id==='s-'+s));
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('on',b.dataset.s===s));
+  if(s!=='game'){document.body.classList.remove('fs');const f=document.getElementById('fsBtn');if(f)f.textContent=T[lang].fsOn;if(tickTimer)clearInterval(tickTimer);sel=null}
+  if(s==='lobby'){refreshProfile();updateSessionUI()}
+  if(s==='game')startTicking();
+  requestAnimationFrame(fitBoard);
+}
+function toggleFullscreen(){
+  const on=!document.body.classList.contains('fs');
+  document.body.classList.toggle('fs',on);
+  const f=document.getElementById('fsBtn');
+  if(f)f.textContent=on?T[lang].fsOff:T[lang].fsOn;
+  setTimeout(fitBoard,40);
+  setTimeout(fitBoard,220);
+}
+function fitBoard(){
+  const stage=document.querySelector('#s-game.on .board-stage');
+  if(!stage)return;
+  const r=stage.getBoundingClientRect();
+  const cs=getComputedStyle(stage);
+  const availW=r.width-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const availH=r.height-parseFloat(cs.paddingTop)-parseFloat(cs.paddingBottom);
+  const frame=stage.querySelector('.board-frame');
+  if(!frame||availW<20||availH<20)return;
+  const size=Math.max(150,Math.floor(Math.min(availW,availH)));
+  const cur=parseFloat(frame.style.width)||0;
+  if(Math.abs(cur-size)<=2)return; // histéresis: al mover piezas el tablero NO cambia de tamaño
+  frame.style.width=size+'px';
+  frame.style.height=size+'px';
+}
+window.addEventListener('resize',()=>requestAnimationFrame(fitBoard));
+function syncMode(){
+  const host=mode==='host';
+  const L=T[lang];
+  document.getElementById('connTitle').textContent=host?L.createGame:L.joinGame;
+  document.getElementById('connDesc').textContent=peerConnected?('Conectado con '+peerName+' · ambos véis el estado en vivo'):(host?L.waitConn:L.scanConn);
+  document.getElementById('listenBtn').style.display=(host&&!peerConnected)?'flex':'none';
+  document.getElementById('scanBtn').style.display=(!host&&!peerConnected)?'flex':'none';
+  document.getElementById('deviceBox').innerHTML='';
+  const chip=document.getElementById('myNameChip'); if(chip)chip.textContent='YO · '+String(myName).slice(0,18);
+  const rp=document.getElementById('rivalPanel'); if(rp)rp.style.display=peerConnected?'flex':'none';
+  updateSessionUI();
+}
+let hostHereTimer=null;
+function stopHostHere(){if(hostHereTimer){clearInterval(hostHereTimer);hostHereTimer=null}}
+function updateLobbyConnPill(){const pill=document.getElementById('lobbyConnPill');if(pill)pill.style.visibility=peerConnected?'visible':'hidden'}
+function toast(id,msg){const t=document.getElementById(id);t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400)}
+function activeToastId(){const c=document.querySelector('.sc.on .toast');return c?c.id:'toastHome'}
+function toggleSound(el){soundOn=!soundOn;
+  document.querySelectorAll('.switch').forEach(s=>{if(s.id==='soundSw'||s.id==='soundSw2')s.classList.toggle('on',soundOn)});
+  localStorage.setItem('cbt_sound',soundOn?'1':'0');
+  if(soundOn)Sound.init();Sound.click();
+  toast(activeToastId(),soundOn?'Sonidos activados':'Sonidos en silencio')}
+function startListen(){
+  peerRole='host'; peerConnected=false; peerName='';
+  stopHostHere();
+  const box=document.getElementById('deviceBox');
+  box.innerHTML='<p class="muted" style="padding:14px;text-align:center"><span class="pulse" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);margin-right:8px"></span>Escuchando… abre el preview en OTRA pestaña, pulsa «Unirse a partida» y en «Buscar rivales», y pulsa «Conectar».<br><small style="color:var(--muted)">Dos pestañas = dos móviles reales hablando entre sí.</small></p>';
+  document.getElementById('listenBtn').style.display='flex';
+  updateSessionUI();
+  hostHereTimer=setInterval(()=>{ if(peerRole==='host'&&!peerConnected)peerSend({t:'HOST_HERE'}) },1500);
+}
+function doScan(){
+  peerRole='guest'; peerConnected=false; peerName='';
+  stopHostHere();
+  const box=document.getElementById('deviceBox');
+  box.innerHTML='<p class="muted" style="padding:14px;text-align:center"><span class="pulse" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--gold);margin-right:8px"></span>Buscando anfitriones CHESS-X cercanos…<br><small style="color:var(--muted)">Abre otra pestaña en «Crear partida → Escuchar» y este móvil la encontrará.</small></p>';
+  peerSend({t:'SEEK'});
+}
+const TCS=[[0,'∞','Sin límite'],[60,'1+0','Relámpago'],[180,'3+0','Bala'],[180,'3+2','Bala+'],[300,'5+0','Rápidas'],[300,'5+3','Rápidas+'],[600,'10+0','Clásico'],[600,'10+5','Clásico+'],[900,'15+10','Larga'],[1800,'30+0','Media'],[3600,'60+0','Estándar']];
+let selTC='5+0';
+const tcGrid=document.getElementById('tcGrid');
+if(tcGrid){
+TCS.forEach(([s,label,sub])=>{
+  const el=document.createElement('div'); el.className='tc'+(label===selTC?' on':''); el.innerHTML='<b>'+label+'</b><span>'+sub+'</span>';
+  el.onclick=()=>{selTC=label;tcGrid.querySelectorAll('.tc').forEach(x=>x.classList.toggle('on',x===el))};
+  tcGrid.appendChild(el);
+});
+}
+let myColor='w'; // Color de ESTE móvil. Solo sus piezas se mueven aquí; las del rival SOLO desde su móvil (Bluetooth SPP).
+let colorChosen=false; // si el anfitrión elige manualmente, se respeta; si no, aleatorio al iniciar (orden al rival: el opuesto)
+function pickSide(s){
+  if(s==='r'){
+    colorChosen=false;
+    document.getElementById('sideW').classList.remove('on');
+    document.getElementById('sideB').classList.remove('on');
+    document.getElementById('sideR').classList.add('on');
+  }else{
+    myColor=s; colorChosen=true;
+    document.getElementById('sideW').classList.toggle('on',s==='w');
+    document.getElementById('sideB').classList.toggle('on',s==='b');
+    document.getElementById('sideR').classList.remove('on');
+  }
+  try{localStorage.setItem('cbt_color',s)}catch(e){}
+  applyBadges();
+  if(peerConnected&&peerRole==='host')broadcastLobbyConfig();
+}
+function applyBadges(){
+  const L=T[lang];
+  document.getElementById('youBadge').textContent=colorChosen?(myColor==='w'?L.white:L.black).toUpperCase():'?';
+  document.getElementById('rivBadge').textContent=colorChosen?(myColor==='w'?L.black:L.white).toUpperCase():'?';
+}
+
+/* ===== sonido profesional (WebAudio con síntesis realista, cero assets) ===== */
+const Sound=(()=>{
+  let ctx=null;
+  function init(){if(!ctx){try{ctx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){}}if(ctx&&ctx.state==='suspended')ctx.resume()}
+  function playNote(freq, dur, type, vol, when, opts={}){
+    if(!soundOn||!ctx)return;
+    const t=ctx.currentTime+(when||0);
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    const filter=ctx.createBiquadFilter();
+    o.type=type||'sine';
+    o.frequency.setValueAtTime(freq,t);
+    if(opts.slideTo)o.frequency.exponentialRampToValueAtTime(Math.max(30,opts.slideTo),t+dur);
+    if(opts.vibrato){
+      const v=ctx.createOscillator(), vg=ctx.createGain();
+      v.type='sine'; v.frequency.value=opts.vibrato.freq||5;
+      vg.gain.value=opts.vibrato.depth||2;
+      v.connect(vg); vg.connect(o.frequency); v.start(t); v.stop(t+dur+0.05);
+    }
+    filter.type='lowpass'; filter.frequency.value=opts.filterFreq||3000; filter.Q.value=opts.filterQ||1;
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.linearRampToValueAtTime(vol*(soundVol/100),t+0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(filter); filter.connect(g); g.connect(ctx.destination);
+    o.start(t); o.stop(t+dur+0.05);
+  }
+  return{
+    init,
+    move(){init();
+      // Professional wood-on-wood thock
+      playNote(420, 0.045, 'triangle', 0.18, 0, {filterFreq:800, filterQ:2});
+      playNote(280, 0.08, 'sine', 0.25, 0.01, {filterFreq:600, filterQ:1.5});
+      playNote(180, 0.12, 'sine', 0.15, 0.02, {filterFreq:400, filterQ:1});
+    },
+    capture(){init();
+      // Sharp capture sound with body
+      playNote(600, 0.03, 'square', 0.22, 0, {filterFreq:1200, filterQ:3});
+      playNote(220, 0.15, 'sine', 0.3, 0.01, {filterFreq:500, filterQ:1.5, vibrato:{freq:8, depth:3}});
+      playNote(120, 0.25, 'sine', 0.2, 0.03, {filterFreq:300, filterQ:1});
+    },
+    check(){init();
+      // Clear warning chime
+      playNote(880, 0.12, 'sine', 0.25, 0, {filterFreq:2000, filterQ:0.5});
+      playNote(1175, 0.14, 'sine', 0.22, 0.1, {filterFreq:2500, filterQ:0.5});
+      playNote(1760, 0.08, 'sine', 0.18, 0.2, {filterFreq:3000, filterQ:0.5});
+    },
+    mate(){init();
+      // Defeated fanfare - descending minor chord
+      const notes=[1047, 784, 659, 523, 392];
+      notes.forEach((f,i)=>playNote(f, 0.35, 'sine', 0.22, i*0.14, {filterFreq:1500, filterQ:0.7, vibrato:{freq:4, depth:1}}));
+    },
+    illegal(){init();
+      // Buzzy error - dissonant
+      playNote(180, 0.18, 'sawtooth', 0.2, 0, {filterFreq:400, filterQ:4, slideTo:120});
+      playNote(140, 0.22, 'sawtooth', 0.18, 0.05, {filterFreq:350, filterQ:4, slideTo:90});
+    },
+    end(){init();
+      // Game end - soft resolution
+      playNote(523, 0.25, 'sine', 0.2, 0, {filterFreq:1000, filterQ:0.5});
+      playNote(392, 0.4, 'sine', 0.22, 0.18, {filterFreq:800, filterQ:0.5});
+    },
+    click(){init();
+      // UI click - subtle tick
+      playNote(1200, 0.02, 'triangle', 0.08, 0, {filterFreq:2000, filterQ:0.5});
+    },
+    offer(){init();
+      // Draw offer - gentle double tone
+      playNote(660, 0.1, 'sine', 0.18, 0, {filterFreq:1500, filterQ:0.5});
+      playNote(880, 0.1, 'sine', 0.16, 0.1, {filterFreq:2000, filterQ:0.5});
+    }
+  };
+})();
+let soundVol=80;
+/* ===== Sonidos reales de Lichess (MP3 woodland/robot, servidos junto a la app) ===== */
+const Lx=(()=>{
+  const cache={};
+  const base='app/src/main/res/raw/';
+  function play(name,vol){
+    if(!soundOn)return;
+    try{
+      let a=cache[name];
+      if(!a){a=new Audio(base+name+'.mp3');a.preload='auto';cache[name]=a}
+      const inst=a.cloneNode(true);
+      inst.volume=Math.max(0,Math.min(1,(vol==null?1:vol)*(soundVol/100)));
+      const p=inst.play();
+      if(p&&p.catch)p.catch(()=>{});
+    }catch(e){}
+  }
+  return {play};
+})();
+Sound.move=()=>Lx.play('move',1);
+Sound.capture=()=>Lx.play('capture',1);
+Sound.check=()=>Lx.play('check',1);
+Sound.mate=()=>Lx.play('checkmate',1);
+Sound.illegal=()=>Lx.play('error',0.9);
+Sound.lowtime=()=>Lx.play('lowtime',0.9);
+Sound.click=()=>Lx.play('select',0.6);
+Sound.offer=()=>Lx.play('confirmation',0.9);
+Sound.win=()=>Lx.play('victory',1);
+Sound.lose=()=>Lx.play('defeat',1);
+Sound.drawSnd=()=>Lx.play('draw',1);
+Sound.init=()=>{};
+document.addEventListener('pointerdown',()=>Sound.init(),{once:true});
+
+
+/* ===== Peer real entre dos pestañas (BroadcastChannel) — demo honesta, sin dispositivos falsos.
+   La app Android usa Bluetooth SPP; aquí cada pestaña es un jugador real intercambiando
+   mensajes reales (hello / perfil / jugadas / reloj). Abre el preview en DOS pestañas. ===== */
+const PEER_CHANNEL='chessx_peer_v1';
+const peerId='tab_'+Math.random().toString(36).slice(2,10);
+const peerChan=(typeof BroadcastChannel!=='undefined')?new BroadcastChannel(PEER_CHANNEL):null;
+let peerRole=null;      // 'host' | 'guest'
+let peerConnected=false;
+let peerName='';
+let peerProfile=null;
+function $id(id){return document.getElementById(id)}
+function peerSend(obj){try{if(!peerChan)return;obj.from=peerId;obj.name=myName;peerChan.postMessage(obj)}catch(e){}}
+if(peerChan)peerChan.onmessage=ev=>{try{handlePeer(ev.data)}catch(e){}};
+function buildPeerProfile(){
+  let all=[];try{all=JSON.parse(localStorage.getItem('cbt_pgns')||'[]')}catch(e){}
+  let wins=0,draws=0,losses=0;
+  all.forEach(g=>{if(g.w===true)wins++;else if(g.w===false)losses++;else draws++});
+  let photo='';try{photo=localStorage.getItem('cbt_photo')||''}catch(e){}
+  const games=(privacy&&privacy.history)?all.slice(0,20).map(g=>({d:g.d,r:g.r,n:g.n,me:g.myName,opp:g.rivalName})):[];
+  return {name:myName,photo:(privacy&&privacy.photo)?photo:'',total:all.length,wins,draws,losses,color:colorChosen?myColor:'random',games:games};
+}
+function shareProfile(){peerSend(Object.assign({t:'PROFILE'},buildPeerProfile()))}
+function shareProfileSoon(){setTimeout(shareProfile,150)}
+function applyPeerProfile(p){
+  if(!p)return;
+  peerProfile=p; peerName=p.name||'Rival';
+  applyRivalProfile({name:peerName,photo:p.photo||'',history:(p.games||[]).map(g=>({d:g.d,r:g.r,n:g.n,myName:g.me,rivalName:g.opp})),color:p.color||'',wins:p.wins||0,draws:p.draws||0,losses:p.losses||0,total:p.total||0});
+}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function showHostFound(msg){
+  const box=$id('deviceBox'); if(!box)return; box.innerHTML='';
+  const d=document.createElement('button');d.className='dev-row';
+  d.innerHTML='<div class="dev-ic">'+esc((msg.name||'?').charAt(0).toUpperCase())+'</div><div class="dev-info"><b>'+esc(msg.name||'Anfitrión CHESS-X')+'</b><small>CHESS-X · Esperando jugadores</small></div><span class="dev-join">Conectar</span>';
+  d.onclick=()=>{peerSend({t:'JOIN'});const s=d.querySelector('.dev-join');if(s)s.textContent='Conectando…';Sound.click()};
+  box.appendChild(d);
+}
+function showGuestFound(msg){
+  const box=$id('deviceBox'); if(!box)return; box.innerHTML='';
+  const d=document.createElement('div');d.className='dev-row';
+  d.innerHTML='<div class="dev-ic">'+esc((msg.name||'?').charAt(0).toUpperCase())+'</div><div class="dev-info"><b>'+esc(msg.name||'Invitado CHESS-X')+'</b><small>Te está buscando · espera a que se conecte</small></div><span class="dev-wait">Esperando…</span>';
+  box.appendChild(d);
+}
+function acceptPeer(msg){
+  if(peerConnected)return;
+  peerConnected=true; peerName=msg.name||'Rival';
+  peerSend({t:'ACCEPT'});
+  const box=$id('deviceBox'); if(box)box.innerHTML='<p class="muted" style="padding:14px;text-align:center">Conectado con <b>'+esc(peerName)+'</b> · ambos véis el tablero en simultáneo</p>';
+  shareProfileSoon();
+  go('lobby'); updateSessionUI(); Lx.play('confirmation',0.9);
+}
+function finishPeerConnect(msg){
+  if(peerConnected)return;
+  peerConnected=true; peerName=msg.name||'Rival';
+  shareProfileSoon();
+  go('lobby'); updateSessionUI(); Lx.play('confirmation',0.9);
+}
+function closePeer(){
+  peerConnected=false; peerRole=null; peerName=''; peerProfile=null;
+  document.querySelectorAll('.dev-row,.dev-wait,.dev-join').forEach(e=>e.remove());
+  const box=$id('deviceBox'); if(box)box.innerHTML='';
+  updateSessionUI();
+}
+function updateSessionUI(){
+  const conn=peerConnected;
+  const isHost=peerRole==='host';
+  const createBtn=$id('createBtn'), joinBtn=$id('joinBtn'), note=$id('sessionNote');
+  if(note){note.style.display=conn?'block':'none';note.textContent=conn?(isHost?'Conectado como anfitrión · tu sala está activa':'Conectado como invitado · el anfitrión administra la sala'):''}
+  if(createBtn){createBtn.disabled=conn;const s=createBtn.querySelector('span');if(s)s.textContent=conn?'Desconéctate de la sala primero':'Anfitrión · decide reloj y color'}
+  if(joinBtn){joinBtn.disabled=conn}
+  const startBtn=$id('startBtn'), guestWait=$id('guestWait');
+  if(startBtn&&guestWait){
+    startBtn.style.display=(!conn||isHost)?'flex':'none';
+    guestWait.style.display=(conn&&!isHost)?'flex':'none';
+  }
+  const rp=$id('rivalPanel'); if(rp)rp.style.display=conn?'flex':'none';
+  const lp=$id('lobbyRivalPanel'); if(lp)lp.style.display=conn?'block':'none';
+  const chip=$id('myNameChip'); if(chip)chip.textContent='YO · '+String(myName).slice(0,18);
+  const rnm=peerName||'Rival';
+  [['rivalProfileLabel','lobbyRivalLabel']].forEach(pair=>{pair.forEach(id=>{const e=$id(id);if(e)e.textContent='Ver perfil de '+rnm})});
+  const stats=peerProfile?((peerProfile.total||0)+' jugadas · '+(peerProfile.wins||0)+'V · '+(peerProfile.losses||0)+'D · '+(peerProfile.draws||0)+'E'):'Sin estadísticas compartidas';
+  ['rivalProfileMeta','lobbyRivalMeta'].forEach(id=>{const e=$id(id);if(e)e.textContent=stats});
+  const lh=$id('lobbyHint');
+  if(lh)lh.textContent=conn?(isHost?'Eres el anfitrión · elige reloj y color; luego Comenzar.':'El anfitrión administra la sala · tú ves reloj y color aquí.'):'Configura tu perfil · conéctate con el rival para jugar.';
+  const pill=$id('lobbyConnPill'); if(pill)pill.style.visibility=conn?'visible':'hidden';
+}
+function broadcastLobbyConfig(){
+  peerSend({t:'LOBBY',min:setMin,inc:setInc,color:colorChosen?myColor:null,random:!colorChosen});
+}
+function applyLobbyConfig(msg){
+  setMin=msg.min; setInc=msg.inc;
+  try{localStorage.setItem('cbt_min',setMin);localStorage.setItem('cbt_inc',setInc)}catch(e){}
+  const stMin=$id('stMin'), stInc=$id('stInc'); if(stMin)stMin.textContent=setMin; if(stInc)stInc.textContent=setInc;
+  const tcChip=$id('tcCur'); if(tcChip)tcChip.textContent=setMin+'+'+setInc;
+  if(msg.random){colorChosen=false;pickSideVisual('r')}
+  else{myColor=msg.color==='b'?'b':'w';colorChosen=true;pickSideVisual(myColor)}
+  gameMeta.rivalName=peerName;
+  gameMeta.rivalColor=myColor==='w'?'b':'w';
+}
+function pickSideVisual(s){
+  const w=$id('sideW'), b=$id('sideB'), r=$id('sideR');
+  if(w)w.classList.toggle('on',s==='w');
+  if(b)b.classList.toggle('on',s==='b');
+  if(r)r.classList.toggle('on',s==='r');
+  applyBadges();
+}
+function receiveStart(msg){
+  myColor=(msg.color==='b')?'w':'b';
+  colorChosen=true;pickSideVisual(myColor);
+  setMin=msg.min; setInc=msg.inc;
+  const secs=msg.min*60, ip=msg.inc;
+  gameMeta={myName:myName,rivalName:peerName,myColor:myColor,t:msg.min+'+'+msg.inc};
+  const youN=$id('youName'); if(youN)youN.textContent=myName;
+  const rivN=$id('rivName'), rivAv=$id('rivAvatar');
+  if(rivN)rivN.textContent=peerName; if(rivAv)rivAv.textContent=(peerName||'R').charAt(0).toUpperCase();
+  const tcChip=$id('tcCur'); if(tcChip)tcChip.textContent=setMin+'+'+setInc;
+  applyBadges(); renderPhoto();
+  moveList=[];replay=null;
+  const rb=$id('replayBar'); if(rb)rb.style.display='none';
+  inc=ip; baseTime=secs;
+  board=START.map(r=>r.slice());sel=null;lastMove=null;turn='w';history=[];
+  castW={K:true,Q:true};castB={K:true,Q:true};epSq=null;isSideChecked=false;errSq=null;
+  wt=baseTime||300;bt=baseTime||300;gameOn=false;
+  const pb=$id('pauseBtn'); if(pb)pb.textContent=T[lang].pause;
+  render(); if(tickTimer)clearInterval(tickTimer); go('game'); requestAnimationFrame(fitBoard); startCountdown();
+}
+function receivePeerMove(msg){
+  const f=msg.f, to=msg.to; if(!f||!to)return;
+  const fr=f[0], fc=f[1], tr=to[0], tc=to[1], promo=msg.p||null;
+  if(fr<0||fr>7||fc<0||fc>7||tr<0||tr>7||tc<0||tc>7)return;
+  const piece=board[fr]&&board[fr][fc]; if(!piece)return;
+  if(piece[0].toLowerCase()===myColor)return;      // nunca aplico MI pieza por mensaje externo
+  if(turn===myColor)return;                         // sólo mueve la pestaña rival en su turno
+  if(!legalMoves(fr,fc).some(([r2,c2])=>r2===tr&&c2===tc))return;
+  const isCapture=board[tr][tc]||(epSq&&epSq.r===tr&&epSq.c===tc&&piece[1]==='P');
+  const out=applyMove(board,[fr,fc],[tr,tc],epSq,promo); board=out.nb;
+  if(piece[1]==='K'){if(piece[0]==='W'){castW.K=castW.Q=false}else{castB.K=castB.Q=false}}
+  const ruin=(rw,cf)=>{if(rw===7&&cf===7)castW.K=false;if(rw===7&&cf===0)castW.Q=false;if(rw===0&&cf===7)castB.K=false;if(rw===0&&cf===0)castB.Q=false};
+  ruin(fr,fc);ruin(tr,tc);
+  sel=null;lastMove=[fr,fc,tr,tc];history.push(msg.san||'');
+  moveList.push({f:[fr,fc],t:[tr,tc],p:promo,ms:(turn==='w'?wt:bt)});
+  if(piece[1]==='P'&&Math.abs(tr-fr)===2)epSq={r:(fr+tr)/2,c:fc};else epSq=null;
+  if(inc>0){if(turn==='w')wt+=inc;else bt+=inc}
+  turn=turn==='w'?'b':'w';
+  isSideChecked=inCheck(board,turn==='w');
+  render();
+  if(isSideChecked)Sound.check();
+  checkEnd();
+}
+function finishQuickDraw(){
+  gameOn=false; if(tickTimer)clearInterval(tickTimer);
+  window.__lastResult={w:null}; Sound.drawSnd&&Sound.drawSnd();
+  savePgn('1/2-1/2');
+  showModal('Tablas','Ambos acordáis tablas.',[{t:T[lang].newGame,cls:'primary',fn:startGame},{t:T[lang].backHome,fn:()=>go('home')}]);
+}
+function finishByResign(msg){
+  gameOn=false; if(tickTimer)clearInterval(tickTimer);
+  const iLost=(msg.loserColor===myColor);
+  if(iLost)Sound.lose&&Sound.lose(); else Sound.win&&Sound.win();
+  window.__lastResult={w:!iLost};
+  savePgn(iLost?(myColor==='w'?'0-1':'1-0'):(myColor==='w'?'1-0':'0-1'));
+  showModal('Fin de partida',esc(msg.by||'El rival')+' se rinde.',[{t:T[lang].newGame,cls:'primary',fn:startGame},{t:T[lang].backHome,fn:()=>go('home')}]);
+}
+function finishByTimeout(loser){
+  gameOn=false; if(tickTimer)clearInterval(tickTimer);
+  const iLost=(loser===myColor);
+  if(iLost)Sound.lose&&Sound.lose(); else Sound.win&&Sound.win();
+  window.__lastResult={w:!iLost};
+  savePgn(iLost?(myColor==='w'?'0-1':'1-0'):(myColor==='w'?'1-0':'0-1'));
+  showModal('Fin de partida','Tiempo agotado — gana '+(iLost?'el rival':'tú')+'.',[{t:T[lang].newGame,cls:'primary',fn:startGame},{t:T[lang].backHome,fn:()=>go('home')}]);
+}
+function handlePeer(msg){
+  if(!msg||msg.from===peerId)return;
+  switch(msg.t){
+    case 'HOST_HERE':
+      if(peerRole==='guest'&&!peerConnected)showHostFound(msg);
+      break;
+    case 'SEEK':
+      if(peerRole==='host'&&!peerConnected)showGuestFound(msg);
+      break;
+    case 'JOIN':
+      if(peerRole==='host'&&!peerConnected)acceptPeer(msg);
+      break;
+    case 'ACCEPT':
+      if(peerRole==='guest'&&!peerConnected)finishPeerConnect(msg);
+      break;
+    case 'PROFILE':
+      applyPeerProfile(msg);
+      updateSessionUI();
+      break;
+    case 'LOBBY':
+      if(peerRole==='guest')applyLobbyConfig(msg);
+      break;
+    case 'START':
+      if(peerRole==='guest')receiveStart(msg);
+      break;
+    case 'MOVE':
+      receivePeerMove(msg);
+      break;
+    case 'CLOCK':
+      if(peerRole==='guest'){wt=msg.wt;bt=msg.bt;updateClocks()}
+      break;
+    case 'PAUSE':
+      gameOn=!msg.paused; const pb=$id('pauseBtn'); if(pb)pb.textContent=gameOn?T[lang].pause:T[lang].resume; render(); showGameToast(msg.paused?'El rival pausa la partida':'El rival reanuda');
+      break;
+    case 'DRAW_OFFER':
+      showModal(T[lang].draw,esc(msg.by||'El rival')+' ofrece tablas.',[{t:'Aceptar',cls:'primary',fn:()=>peerSend({t:'DRAW_ACCEPT',accepted:true,by:myName})},{t:'Rechazar',cls:'ghost',fn:()=>peerSend({t:'DRAW_ACCEPT',accepted:false,by:myName})}]);
+      break;
+    case 'DRAW_ACCEPT':
+      if(msg.accepted)finishQuickDraw(); else showGameToast('El rival rechaza tablas');
+      break;
+    case 'RESIGN':
+      finishByResign(msg);
+      break;
+    case 'END':
+      if(msg.loser)finishByTimeout(msg.loser);
+      break;
+  }
+}
+
+let modalBtnFns=[];
+function showModal(title,body,buttons,chips){
+  Sound.click();
+  document.getElementById('modalT').textContent=title;
+  const bEl=document.getElementById('modalB');
+  if(body){bEl.innerHTML=body;bEl.style.display='block'}else bEl.style.display='none';
+  const tfn=window.tfn; window.tfn=null;
+  const btnRow=document.getElementById('modalBtns');btnRow.innerHTML='';
+  (buttons||[]).forEach(b=>{
+    const btn=document.createElement('button');btn.className=b.cls||'ghost';btn.textContent=b.t;
+    btn.onclick=()=>{hideModal();if(b.fn)b.fn()};btnRow.appendChild(btn);
+  });
+  btnRow.style.display=(buttons&&buttons.length)?'flex':'none';
+  const chipRow=document.getElementById('modalChips');chipRow.innerHTML='';
+  (chips||[]).forEach(c=>{
+    const box=document.createElement('div');box.className='promo';
+    box.appendChild(pieceImg(c.svg,c.label,38));
+    const span=document.createElement('span');span.textContent=c.label;
+    box.appendChild(span);
+    box.onclick=()=>{hideModal();if(c.fn)c.fn()};chipRow.appendChild(box);
+  });
+  chipRow.style.display=(chips&&chips.length)?'flex':'none';
+  document.getElementById('modalBack').classList.add('show');
+}
+function hideModal(){document.getElementById('modalBack').classList.remove('show')}
+
+/* ===== estado de ajustes ===== */
+let boardTheme='classic';
+function setBoardTheme(th){boardTheme=th;document.body.classList.toggle('dark-board',th==='dark');
+  document.getElementById('thClassicBtn').classList.toggle('on',th==='classic');
+  document.getElementById('thDarkBtn').classList.toggle('on',th==='dark');
+  localStorage.setItem('cbt_theme',th);toast('toastSettings',th==='dark'?'Tablero oscuro activado':'Tablero clásico activado')}
+let lang='es';
+/* ===== i18n real ES/EN ===== */
+const T={
+es:{white:'Blancas',black:'Negras',you:'Tú',myTurn:'Tu turno',playing:'Jugando',paused:'En pausa',rivalTurn:'Turno del rival',
+waitRival:'Turno del rival · esperando su movimiento por Bluetooth',
+rivalPieces:'Son piezas del rival — se mueven desde su móvil',
+toMove:'a mover',waitingBT:'esperando Bluetooth',check:'¡JAQUE!',
+mate:'Jaque mate',mateWin:'ganan por jaque mate.',stalemate:'Ahogado',stalemateMsg:'El rey no tiene jugadas legales: tablas.',staleToast:'Tablas · rey ahogado',
+newGame:'Nueva partida',exit:'Salir',promo:'Promoción',choosePiece:'Elige la pieza',
+pause:'Pausar',resume:'Reanudar',draw:'Tablas',drawMsg:'Se envió la oferta de tablas al rival. Si acepta, la partida termina en empate.',resign:'Abandonar',
+pausedMsg:'Partida en pausa · relojes congelados',resumedMsg:'Partida reanudada',
+resignT:'Abandonar partida',resignC:'¿Confirmas rendirte? El rival ganará la partida.',resignB:'Rendirse',cancel:'Cancelar',
+resignedT:'Abandonaste',resignedM:'Gana el rival por abandono.',backHome:'← Volver al inicio',leaveLobby:'← Abandonar lobby',
+createGame:'Crear partida',joinGame:'Unirse a partida',getReady:'Comienza',
+waitConn:'Pulsa «Escuchar» y espera a que el rival se conecte a tu móvil.',
+scanConn:'Escanea y pulsa «Conectar» del móvil del anfitrión.',
+fsOn:'Pantalla completa',fsOff:'Salir',
+tagline:'Bluetooth real · Reloj sincronizado · Reglas FIDE',
+heroTitle:'Ajedrez en tiempo real<br>entre dos móviles',
+heroDesc:'Conecta por Bluetooth Classic, nombra a los jugadores, el anfitrión inicia y ambos juegan con reloj sincronizado hasta el mate.',
+stat1:'Optimizado',stat2:'Reloj sync',stat3:'Sin cortes*',
+createBtn:'Crear partida <small>Eres el anfitrión · juegas con blancas</small>',
+joinBtn:'Unirse a partida <small>Busca rivales cercanos</small>',
+sndT:'Sonidos',sndS:'Movimientos, capturas, jaque<br>y jaque mate',
+timeT:'Control de tiempo',timeS:'Sincronizado host-autoritativo',
+homeNote:'*Reconexión automática x5 antes de desconectar · sincronización de reloj cada 1s · ningún movimiento ilegal se aplica',
+listen:'Escuchar conexiones<small>Visible por Bluetooth · 300s</small>',
+scan:'Buscar rivales<small>Escaneo activo · mantén el otro móvil cerca</small>',
+demo:'Demo: ir a Perfil<small>Simula conexión exitosa (solo preview)</small>',
+profile:'Perfil',lobbyDesc:'Configura tu perfil y la partida. El anfitrión elige el control de tiempo y el color.',
+yourName:'TU NOMBRE',color:'COLOR',whiteFirst:'Blancas',whiteSub:'Mueven primero',blackFirst:'Negras',blackSub:'Juegan segundo',
+timeCtrl:'CONTROL DE TIEMPO',start:'Comenzar partida<small>Se reflejará al instante en el rival</small>',
+settings:'Ajustes',settingsDesc:'Configura la app. Todo se guarda al instante.',
+board:'TABLERO',classic:'Clásico',dark:'Oscuro',
+privacy:'PRIVACIDAD · COMPARTIR CON EL RIVAL',
+photoT:'Foto de perfil',photoS:'Tu rival verá tu avatar',
+histT:'Historial',histS:'Partidas recientes y resultados',
+pgnT:'PGN',pgnS:'Permitir reproducir tus partidas',
+clockDef:'RELOJ POR DEFECTO',minutes:'Minutos',inc:'Incremento (seg)',
+gameL:'JUEGO',indT:'Indicadores de movimiento',indS:'Puntos y anillos de jugadas legales',
+conn:'CONEXIÓN BLUETOOTH',
+free:'Liberar conexión<small>Cierra el socket Bluetooth de esta app</small>',
+sys:'Ajustes BT del sistema<small>Desvincula o apaga el Bluetooth de Android</small>',
+app:'APLICACIÓN',close:'Cerrar aplicación<small>Termina la sesión y cierra la app</small>',
+footer:'CHESS-X · © Elal Chico · conexión SPP segura',
+dev:'Desarrollado por <b>Elal Chico</b>',
+navHome:'Inicio',navConnect:'Conectar',navProfile:'Perfil',navGame:'Partida',navSettings:'Ajustes'},
+en:{white:'White',black:'Black',you:'You',myTurn:'Your turn',playing:'Playing',paused:'Paused',rivalTurn:"Rival's turn",
+waitRival:"Rival's turn · waiting for their Bluetooth move",
+rivalPieces:"Rival's pieces — they move from their phone",
+toMove:'to move',waitingBT:'waiting for Bluetooth',check:'CHECK!',
+mate:'Checkmate',mateWin:'win by checkmate.',stalemate:'Stalemate',stalemateMsg:'The king has no legal moves: draw.',staleToast:'Draw · stalemate',
+newGame:'New game',exit:'Exit',promo:'Promotion',choosePiece:'Choose a piece',
+pause:'Pause',resume:'Resume',draw:'Draw',drawMsg:'The draw offer was sent to the rival. If they accept, the game ends in a draw.',resign:'Resign',
+pausedMsg:'Game paused · clocks frozen',resumedMsg:'Game resumed',
+resignT:'Resign game',resignC:'Confirm resign? The rival will win the game.',resignB:'Resign',cancel:'Cancel',
+resignedT:'You resigned',resignedM:'Rival wins by resignation.',backHome:'← Back to home',leaveLobby:'← Leave lobby',
+createGame:'Create game',joinGame:'Join game',
+waitConn:'Tap "Listen" and wait for the rival to connect to your phone.',
+scanConn:'Scan and tap "Connect" on the host phone.',
+fsOn:'Fullscreen',fsOff:'Exit',
+tagline:'Real Bluetooth · Synced clock · FIDE rules',
+heroTitle:'Real-time chess<br>between two phones',
+heroDesc:'Connect over Bluetooth Classic, name the players, the host starts and both play with a synced clock until mate.',
+stat1:'Optimized',stat2:'Synced clock',stat3:'No drops*',
+createBtn:"Create game <small>You're the host · you play White</small>",
+joinBtn:'Join game <small>Find nearby rivals</small>',
+sndT:'Sounds',sndS:'Moves, captures, check<br>and checkmate',
+timeT:'Time control',timeS:'Host-authoritative sync',
+homeNote:'*Auto-reconnect x5 before disconnect · clock sync every 1s · no illegal move is applied',
+listen:'Listen for connections<small>Visible over Bluetooth · 300s</small>',
+scan:'Find rivals<small>Active scan · keep the other phone close</small>',
+demo:'Demo: go to Profile<small>Simulates successful connection (preview only)</small>',
+profile:'Profile',lobbyDesc:'Set up your profile and the game. The host chooses time control and color.',
+yourName:'YOUR NAME',color:'COLOR',whiteFirst:'White',whiteSub:'Move first',blackFirst:'Black',blackSub:'Move second',
+timeCtrl:'TIME CONTROL',start:'Start game<small>It will show instantly on the rival</small>',
+settings:'Settings',settingsDesc:'Configure the app. Everything is saved instantly.',
+board:'BOARD',classic:'Classic',dark:'Dark',
+privacy:'PRIVACY · SHARE WITH RIVAL',
+photoT:'Profile photo',photoS:'Your rival will see your avatar',
+histT:'History',histS:'Recent games and results',
+pgnT:'PGN',pgnS:'Allow replaying your games',
+clockDef:'DEFAULT CLOCK',minutes:'Minutes',inc:'Increment (sec)',
+gameL:'GAME',indT:'Move indicators',indS:'Dots and rings for legal moves',
+conn:'BLUETOOTH CONNECTION',
+free:'Release connection<small>Closes this app Bluetooth socket</small>',
+sys:'System BT settings<small>Unpair or turn off Android Bluetooth</small>',
+app:'APPLICATION',close:'Close application<small>Ends the session and closes the app</small>',
+footer:'CHESS-X · © Elal Chico · secure SPP connection',
+dev:'Developed by <b>Elal Chico</b>',
+navHome:'Home',navConnect:'Connect',navProfile:'Profile',navGame:'Game',navSettings:'Settings'}
+};
+function applyLang(){
+  const L=T[lang];
+  const set=(s,v)=>{const el=document.querySelector(s);if(el)el.innerHTML=v};
+  const setT=(s,v)=>{const el=document.querySelector(s);if(el)el.textContent=v};
+  setT('#s-home .brand p',L.tagline);
+  set('#s-home .hero h2',L.heroTitle); set('#s-home .hero p',L.heroDesc);
+  set('#s-home .stats .stat:nth-child(1) span',L.stat1);
+  set('#s-home .stats .stat:nth-child(2) span',L.stat2);
+  set('#s-home .stats .stat:nth-child(3) span',L.stat3);
+  set('#s-home .btn-big p',L.createBtn); set('#s-home .btn-alt p',L.joinBtn);
+  const hrc=document.querySelectorAll('#s-home .row-card');
+  if(hrc[0]){hrc[0].querySelector('b').textContent=L.sndT;hrc[0].querySelector('small').innerHTML=L.sndS}
+  if(hrc[1]){hrc[1].querySelector('b').textContent=L.timeT;hrc[1].querySelector('small').innerHTML=L.timeS}
+  set('#s-home .content>p',L.homeNote);
+  setT('#s-connect .btn-back',L.backHome);
+  set('#listenBtn p',L.listen); set('#scanBtn p',L.scan); set('#demoBtn p',L.demo);
+  setT('#s-lobby .btn-back',L.leaveLobby);
+  setT('#s-lobby h2',L.profile); set('#s-lobby .muted',L.lobbyDesc);
+  const lbl=document.querySelectorAll('#s-lobby .field label');
+  if(lbl[1])lbl[1].textContent=L.yourName; if(lbl[2])lbl[2].textContent=L.color;
+  setT('#sideW b',L.whiteFirst); setT('#sideW small',L.whiteSub);
+  setT('#sideB b',L.blackFirst); setT('#sideB small',L.blackSub);
+  set('#s-lobby .btn-big p',L.start);
+  setT('#s-settings .btn-back',L.backHome);
+  setT('#s-settings h2',L.settings); set('#s-settings .muted',L.settingsDesc);
+  setT('#thClassicBtn',L.classic); setT('#thDarkBtn',L.dark);
+  const slbl=document.querySelectorAll('#s-settings .field label');
+  if(slbl[1])slbl[1].textContent=L.board; if(slbl[2])slbl[2].textContent=L.privacy;
+  if(slbl[3])slbl[3].textContent=L.clockDef; if(slbl[4])slbl[4].textContent=L.gameL;
+  if(slbl[5])slbl[5].textContent=L.conn; if(slbl[6])slbl[6].textContent=L.app;
+  const src=document.querySelectorAll('#s-settings .row-card');
+  if(src[0]){src[0].querySelector('b').textContent=L.sndT;src[0].querySelector('small').innerHTML=L.sndS}
+  if(src[1]){src[1].querySelector('b').textContent=L.photoT;src[1].querySelector('small').innerHTML=L.photoS}
+  if(src[2]){src[2].querySelector('b').textContent=L.histT;src[2].querySelector('small').innerHTML=L.histS}
+  if(src[3]){src[3].querySelector('b').textContent=L.pgnT;src[3].querySelector('small').innerHTML=L.pgnS}
+  if(src[4]){src[4].querySelector('b').textContent=L.indT;src[4].querySelector('small').innerHTML=L.indS}
+  const fl=document.querySelectorAll('#s-settings .btn-flat .lbl');
+  if(fl[0])fl[0].innerHTML=L.free; if(fl[1])fl[1].innerHTML=L.sys; if(fl[2])fl[2].innerHTML=L.close;
+  const sp=document.querySelectorAll('#s-settings .content>p');
+  if(sp[1])sp[1].innerHTML=L.footer; if(sp[2])sp[2].innerHTML=L.dev;
+  setT('#fsBtn',document.body.classList.contains('fs')?L.fsOff:L.fsOn);
+  const ab=document.querySelectorAll('#s-game .actions .a-btn');
+  if(ab[0])ab[0].textContent=gameOn?L.pause:L.resume;
+  if(ab[1])ab[1].textContent=L.draw; if(ab[2])ab[2].textContent=L.resign;
+  const navKey={home:'navHome',connect:'navConnect',lobby:'navProfile',game:'navGame',settings:'navSettings'};
+  document.querySelectorAll('.nav button').forEach(b=>{
+    const key=navKey[b.dataset.s]; if(!key)return;
+    const txt=[...b.childNodes].find(n=>n.nodeType===3&&n.textContent.trim());
+    if(txt)txt.textContent=L[key];
+  });
+  syncMode(); applyBadges();
+  try{render()}catch(e){}
+}
+function setLang(l){lang=l;
+  document.getElementById('langEsBtn').classList.toggle('on',l==='es');
+  document.getElementById('langEnBtn').classList.toggle('on',l==='en');
+  localStorage.setItem('cbt_lang',l);
+  applyLang()}
+function setVolume(v){soundVol=+v;document.getElementById('volLabel').textContent=v+'%';Sound.init();localStorage.setItem('cbt_vol',v)}
+const privacy={photo:true,history:true,pgn:true};
+function priToggle(el,key){privacy[key]=!privacy[key];el.classList.toggle('on',privacy[key]);
+  renderPhoto();renderPgnList();
+  toast('toastSettings',privacy[key]?'Compartiendo activado':'No compartido con el rival')}
+/* ===== perfil: foto, compartir, PGN y reproducción ===== */
+/* Nombre permanente: si nunca se editó, se asigna un ID numérico aleatorio */
+function randomId(){return String(Math.floor(100000+Math.random()*900000))}
+let myName=(()=>{try{const s=localStorage.getItem('cbt_name'); if(s)return s; const r=randomId(); localStorage.setItem('cbt_name',r); return r}catch(e){return randomId()}})();
+function saveName(){
+  const inp=document.getElementById('nameIn');
+  let n=(inp.value||'').trim();
+  if(!n){n=randomId(); inp.value=n}
+  myName=n; localStorage.setItem('cbt_name',n);
+  syncProfileInit(); Sound.click();
+  if(peerConnected)shareProfile();
+  toast('toastLobby','Nombre guardado: '+n);
+}
+let rivNameStored=(()=>{try{return localStorage.getItem('cbt_rivname')||''}catch(e){return ''}})();
+function saveRivalName(){
+  const inp=document.getElementById('rivNameIn');
+  rivNameStored=(inp.value||'').trim();
+  try{localStorage.setItem('cbt_rivname',rivNameStored)}catch(e){}
+  Sound.click(); toast('toastLobby',rivNameStored?'Rival guardado: '+rivNameStored:'Sin nombre de rival');
+}
+const crop={url:null,zoom:1,tx:0,ty:0,view:220};
+function setPhoto(inp){
+  const f=inp.files&&inp.files[0]; if(!f)return;
+  const rd=new FileReader();
+  rd.onload=e=>{crop.url=e.target.result; openCrop()};
+  rd.onerror=()=>toast('toastLobby','No se pudo abrir la imagen');
+  rd.readAsDataURL(f);
+  inp.value='';
+}
+function openCrop(){
+  const img=new Image();
+  img.onload=()=>{
+    crop.tx=0; crop.ty=0; // siempre centrada al inicio
+    const im=document.getElementById('cropImg'); im.src=crop.url;
+    drawCrop();
+    document.getElementById('cropBack').classList.add('show');
+  };
+  img.onerror=()=>toast('toastLobby','No se pudo abrir la imagen');
+  img.src=crop.url;
+}
+function cropRect(){
+  const img=document.getElementById('cropImg');
+  const iw=img.naturalWidth||crop.view, ih=img.naturalHeight||crop.view;
+  const s=Math.max(crop.view/iw,crop.view/ih); // cubre el círculo siempre (sin negro)
+  const dw=iw*s, dh=ih*s;
+  const maxTx=(dw-crop.view)/2, maxTy=(dh-crop.view)/2;
+  crop.tx=Math.max(-maxTx,Math.min(maxTx,crop.tx)); // nunca se sale del círculo
+  crop.ty=Math.max(-maxTy,Math.min(maxTy,crop.ty));
+  return {s,dw,dh};
+}
+function drawCrop(){
+  const img=document.getElementById('cropImg');
+  img.style.display='block';
+  const {dw,dh}=cropRect();
+  img.style.width=dw+'px'; img.style.height=dh+'px';
+  img.style.left=((crop.view-dw)/2+crop.tx)+'px';
+  img.style.top=((crop.view-dh)/2+crop.ty)+'px';
+}
+function closeCrop(){document.getElementById('cropBack').classList.remove('show')}
+function confirmCrop(){
+  const img=new Image();
+  img.onload=()=>{
+    const c=document.createElement('canvas'); c.width=220; c.height=220;
+    const ctx=c.getContext('2d');
+    ctx.fillStyle='#151B24'; ctx.fillRect(0,0,220,220); // fondo del avatar si hay transparencia (JPEG)
+    const {s,dw,dh}=cropRect();
+    const L=(crop.view-dw)/2+crop.tx, T=(crop.view-dh)/2+crop.ty;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(110,110,110,0,Math.PI*2); ctx.clip();
+    ctx.drawImage(img, -L/s, -T/s, crop.view/s, crop.view/s, 0,0,220,220);
+    ctx.restore();
+    try{localStorage.setItem('cbt_photo',c.toDataURL('image/jpeg',0.85))}catch(e){}
+    closeCrop(); renderPhoto(); Sound.click();
+  };
+  img.src=crop.url;
+}
+(()=>{ // arrastre para reencuadrar la foto
+  const view=document.getElementById('cropView');
+  let drag=null;
+  view.addEventListener('pointerdown',e=>{
+    view.setPointerCapture(e.pointerId); view.style.cursor='grabbing';
+    drag={x:e.clientX-crop.tx,y:e.clientY-crop.ty};
+  });
+  view.addEventListener('pointermove',e=>{
+    if(drag){crop.tx=e.clientX-drag.x; crop.ty=e.clientY-drag.y; drawCrop()}
+  });
+  const up=()=>{drag=null; view.style.cursor='grab'};
+  view.addEventListener('pointerup',up); view.addEventListener('pointercancel',up);
+  view.addEventListener('wheel',e=>e.preventDefault(),{passive:false});
+})();
+function renderPhoto(){
+  let url=null; try{url=localStorage.getItem('cbt_photo')}catch(e){}
+  const show=privacy.photo&&!!url;
+  const av=document.getElementById('youAvatar');
+  if(av){ if(show){av.innerHTML='<img src="'+url+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>'} else {av.textContent=(document.getElementById('youName').textContent||'T').charAt(0).toUpperCase()} }
+  const lp=document.getElementById('profImg');
+  if(lp){if(url)lp.src=url; lp.style.display=show?'block':'none'}
+  const pi=document.getElementById('profInit'); if(pi)pi.style.display=show?'none':'inline';
+  const st=document.getElementById('sharePhotoState'); if(st)st.textContent=privacy.photo?'Compartida':'No compartida';
+  if(peerConnected)shareProfile();
+}
+function syncProfileInit(){
+  const nm=(document.getElementById('nameIn').value||'').trim();
+  const el=document.getElementById('profInit'); if(el)el.textContent=(nm||T[lang].you).charAt(0).toUpperCase();
+}
+function refreshProfile(){
+  const inp=document.getElementById('nameIn');
+  if(inp&&document.activeElement!==inp)inp.value=myName;
+  const rin=document.getElementById('rivNameIn');
+  if(rin&&document.activeElement!==rin)rin.value=rivNameStored;
+  syncProfileInit();renderPhoto();renderPgnList();renderStats();
+}
+let gameMeta={myName:myName,rivalName:'Rival',myColor:'w',t:'5+0'};
+/* Perfil del rival (user 2): llega por Bluetooth SPP con su nombre, foto e historial. */
+let rivalProfile={name:'',photo:'',history:[],color:'',wins:0,draws:0,losses:0,total:0};
+function applyRivalProfile(p){
+  if(!p)return;
+  rivalProfile=Object.assign({name:'',photo:'',history:[],color:'',wins:0,draws:0,losses:0,total:0},p);
+  const nm=rivalProfile.name||gameMeta.rivalName||'Rival';
+  gameMeta.rivalName=nm;
+  const rn=document.getElementById('rivName'); if(rn)rn.textContent=nm;
+  const ra=document.getElementById('rivAvatar');
+  if(ra){
+    if(rivalProfile.photo){ra.innerHTML='<img src="'+rivalProfile.photo+'" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>';}
+    else ra.textContent=(nm||'R').charAt(0).toUpperCase();
+  }
+  render();
+  updateSessionUI();
+}
+function openRivalProfile(){
+  const nm=esc(rivalProfile.name||gameMeta.rivalName||'Rival');
+  const hist=rivalProfile.history||[];
+  let body='';
+  body+='<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;text-align:left">'
+    +'<div style="width:54px;height:54px;flex:0 0 54px;border-radius:50%;overflow:hidden;background:linear-gradient(145deg,#2A3543,#151B24);border:1px solid #26303C;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#FF9B9B">'
+    +(rivalProfile.photo?'<img src="'+rivalProfile.photo+'" style="width:100%;height:100%;object-fit:cover"/>':(nm||'R').charAt(0).toUpperCase())
+    +'</div><div style="min-width:0;flex:1"><b style="display:block;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+nm+'</b>'
+    +'<small style="color:var(--muted);font-size:11px">Rival · '+(rivalProfile.color?(rivalProfile.color==='w'?'Blancas':'Negras'):'color por asignar')+'</small></div></div>';
+  body+='<div style="display:flex;gap:6px;margin-bottom:10px">'
+    +'<div class="stat" style="flex:1"><b>'+(rivalProfile.total||0)+'</b><span>Jugadas</span></div>'
+    +'<div class="stat" style="flex:1"><b>'+(rivalProfile.wins||0)+'</b><span>Victorias</span></div>'
+    +'<div class="stat" style="flex:1"><b>'+(rivalProfile.draws||0)+'</b><span>Empates</span></div>'
+    +'<div class="stat" style="flex:1"><b>'+(rivalProfile.losses||0)+'</b><span>Derrotas</span></div></div>';
+  if(hist.length){
+    body+='<div style="max-height:220px;overflow-y:auto;text-align:left;display:flex;flex-direction:column;gap:6px">';
+    hist.slice(0,20).forEach(g=>{
+      body+='<div style="background:#0F141B;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:11px">'
+        +'<div style="display:flex;justify-content:space-between;gap:8px"><b>'+esc(g.d||'')+'</b><span style="color:var(--gold);font-weight:800">'+esc(g.r||'')+'</span></div>'
+        +'<div style="color:var(--muted);margin-top:2px">'+(+g.n||0)+' jugadas · '+esc(g.myName||nm)+' vs '+esc(g.rivalName||'')+'</div></div>';
+    });
+    body+='</div>';
+  }else{
+    body+='<p style="font-size:12px;color:var(--muted)">El rival no ha compartido historial.</p>';
+  }
+  showModal('Perfil del rival',body,[{t:'Cerrar',cls:'primary'}]);
+}
+function renderStats(){
+  const box=document.getElementById('statsBox'); if(!box)return;
+  let all=[]; try{all=JSON.parse(localStorage.getItem('cbt_pgns')||'[]')}catch(e){}
+  let w=0,d=0,l=0;
+  all.forEach(g=>{
+    if(g.w===true)w++; else if(g.w===false)l++; else if(g.r==='1/2-1/2')d++;
+  });
+  const total=w+d+l;
+  const wr=total?Math.round(w/total*100):0;
+  box.innerHTML=
+    '<div class="stat"><b>'+total+'</b><span>Jugadas</span></div>'+
+    '<div class="stat"><b>'+w+'</b><span>Victorias</span></div>'+
+    '<div class="stat"><b>'+d+'</b><span>Empates</span></div>'+
+    '<div class="stat"><b>'+l+'</b><span>Derrotas</span></div>'+
+    '<div class="stat"><b>'+wr+'%</b><span>Victoria</span></div>';
+}
+function renderEloChips(elo){
+  const y=document.getElementById('youElo'), r=document.getElementById('rivElo');
+  if(y)y.textContent='';
+  if(r)r.textContent='';
+}
+function savePgn(result){
+  if(!moveList||!moveList.length)return;
+  try{
+    const all=JSON.parse(localStorage.getItem('cbt_pgns')||'[]');
+    const whiteName=gameMeta.myColor==='w'?gameMeta.myName:gameMeta.rivalName;
+    const blackName=gameMeta.myColor==='w'?gameMeta.rivalName:gameMeta.myName;
+    const res=window.__lastResult||{w:null};
+    const g={d:new Date().toLocaleDateString(lang==='es'?'es-ES':'en-US'),r:result,w:res.w,n:moveList.length,
+      moves:moveList.map(m=>({f:m.f,t:m.t,p:m.p,ms:m.ms||0})),
+      myName:gameMeta.myName,rivalName:gameMeta.rivalName,myColor:gameMeta.myColor,t:gameMeta.t};
+    g.pgn=buildPgnText(g,whiteName,blackName);
+    all.unshift(g);
+    localStorage.setItem('cbt_pgns',JSON.stringify(all.slice(0,20)));
+    renderStats();
+  }catch(e){}
+}
+function buildPgnText(g,whiteName,blackName){
+  const parts=[];
+  parts.push('[Event "CHESS-X"]');
+  parts.push('[Site "Bluetooth SPP"]');
+  parts.push('[Date "'+new Date().toLocaleDateString('en-CA').replace(/-/g,'.')+'"]');
+  parts.push('[White "'+whiteName+'"]');
+  parts.push('[Black "'+blackName+'"]');
+  parts.push('[Result "'+g.r+'"]');
+  parts.push('[TimeControl "'+g.t+'"]');
+  let body='';
+  g.moves.forEach((m,i)=>{
+    const san=history[i]||'';
+    const clk={w:0,b:0};
+    /* comentarios de reloj por jugada */
+    const sec=Math.max(0,Math.round(m.ms||0));
+    const mm=Math.floor(sec/60), ss=String(sec%60).padStart(2,'0');
+    if(i%2===0)body+=(i/2+1)+'. ';
+    body+=san+' { %clk '+mm+':'+ss+' } ';
+  });
+  return parts.join('\n')+'\n\n'+body+g.r;
+}
+function renderPgnList(){
+  const box=document.getElementById('pgnBox'); if(!box)return;
+  let all=[]; try{all=JSON.parse(localStorage.getItem('cbt_pgns')||'[]')}catch(e){}
+  if(!all.length){box.innerHTML='<p class="muted" style="font-size:12px;line-height:1.5">Sin partidas guardadas todavía. Al terminar una partida por Bluetooth se guardará aquí su PGN.</p>';return}
+  box.innerHTML='';
+  const head=document.createElement('div');
+  head.style.cssText='display:flex;align-items:center;gap:8px';
+  const cnt=document.createElement('span');
+  cnt.style.cssText='flex:1;font-size:12px;color:var(--muted);font-weight:700';
+  cnt.textContent=all.length+' partida'+(all.length>1?'s':'');
+  const clear=document.createElement('button'); clear.className='btn-link';
+  clear.style.cssText='background:#3A2222;color:#FF9B9B;border:1px solid #4A2626';
+  clear.textContent='Borrar todo';
+  clear.onclick=()=>{try{localStorage.setItem('cbt_pgns','[]')}catch(e){} Sound.click(); renderPgnList(); renderStats();};
+  head.appendChild(cnt); head.appendChild(clear); box.appendChild(head);
+  all.forEach((g,i)=>{
+    const d=document.createElement('div'); d.className='pgn-item';
+    const txt=document.createElement('div');
+    txt.innerHTML='<b>'+(g.myName||'Tú')+' vs '+(g.rivalName||'Rival')+'</b><small>'+g.d+' · '+g.r+' · '+g.n+' jugadas · '+(g.t||'')+(g.myColor==='w'?' · Juegas blancas':' · Juegas negras')+'</small>';
+    const btn=document.createElement('button'); btn.className='btn-link';
+    btn.textContent=privacy.pgn?'Reproducir':'Sin permiso';
+    btn.disabled=!privacy.pgn; btn.onclick=()=>startReplay(g);
+    const del=document.createElement('button'); del.className='btn-link';
+    del.style.cssText='background:#3A2222;color:#FF9B9B;border:1px solid #4A2626';
+    del.textContent='Eliminar';
+    del.onclick=()=>{try{const a2=JSON.parse(localStorage.getItem('cbt_pgns')||'[]'); a2.splice(i,1); localStorage.setItem('cbt_pgns',JSON.stringify(a2))}catch(e){} Sound.click(); renderPgnList(); renderStats();};
+    d.appendChild(txt); d.appendChild(btn); d.appendChild(del);
+    box.appendChild(d);
+    const pgnBtn=document.createElement('button'); pgnBtn.className='btn-link';
+    pgnBtn.style.cssText='background:transparent;color:var(--gold);border:1px solid var(--line2)';
+    pgnBtn.textContent='PGN';
+    const pre=document.createElement('pre');
+    pre.style.cssText='display:none;font-size:10.5px;line-height:1.5;background:#0F141B;border:1px solid var(--line);border-radius:10px;padding:10px;overflow-x:auto;color:#C6CDD8;margin:6px 0 0';
+    pre.textContent=g.pgn||'';
+    pgnBtn.onclick=()=>{pre.style.display=pre.style.display==='none'?'block':'none'};
+    box.appendChild(pgnBtn);
+    box.appendChild(pre);
+  });
+}
+function startReplay(g){
+  replay={moves:g.moves.map(m=>({f:m.f,t:m.t,p:m.p||null,ms:m.ms||0})),idx:0};
+  /* datos de la partida: nombres, colores y tiempos se reproducen */
+  myColor=g.myColor||'w';
+  document.getElementById('youName').textContent=g.myName||'Tú';
+  document.getElementById('rivName').textContent=g.rivalName||'Rival';
+  document.getElementById('youAvatar').textContent=(g.myName||'T').charAt(0).toUpperCase();
+  document.getElementById('rivAvatar').textContent=(g.rivalName||'R').charAt(0).toUpperCase();
+  const m=String(g.t||'5+0').match(/^(\d+)\+(\d+)$/);
+  baseTime=m?(+m[1]*60):300; wt=baseTime; bt=baseTime;
+  gameOn=false; if(tickTimer)clearInterval(tickTimer);
+  document.getElementById('replayBar').style.display='flex';
+  applyReplay();
+  go('game');
+}
+function applyReplay(){
+  board=START.map(r=>r.slice()); epSq=null; castW={K:true,Q:true}; castB={K:true,Q:true}; lastMove=null;
+  for(let i=0;i<replay.idx;i++){
+    const mv=replay.moves[i]; const pc=board[mv.f[0]][mv.f[1]];
+    const {nb,newEp}=applyMove(board,mv.f,mv.t,epSq,mv.p);
+    board=nb; epSq=newEp;
+    if(pc&&pc[1]==='K'){if(pc[0]==='W'){castW.K=castW.Q=false}else{castB.K=castB.Q=false}}
+    const ruin=(rw2,cf2)=>{if(rw2===7&&cf2===7)castW.K=false;if(rw2===7&&cf2===0)castW.Q=false;if(rw2===0&&cf2===7)castB.K=false;if(rw2===0&&cf2===0)castB.Q=false};
+    ruin(mv.f[0],mv.f[1]); ruin(mv.t[0],mv.t[1]);
+    lastMove=[mv.f[0],mv.f[1],mv.t[0],mv.t[1]];
+  }
+  document.getElementById('rpPos').textContent=replay.idx+'/'+replay.moves.length;
+  /* relojes de la partida según el tiempo que quedaba en cada jugada */
+  let wms=null,bms=null;
+  for(let i=0;i<replay.idx;i++){ if(i%2===0)wms=replay.moves[i].ms; else bms=replay.moves[i].ms; }
+  if(wms!=null)wt=wms; if(bms!=null)bt=bms;
+  render();
+}
+function rpStep(d){ if(!replay)return; replay.idx=Math.max(0,Math.min(replay.moves.length,replay.idx+d)); applyReplay(); Sound.click(); }
+function exitReplay(){ replay=null; document.getElementById('replayBar').style.display='none'; board=START.map(r=>r.slice()); render(); go('home'); }
+let moveIndicators=true;
+function toggleMoveInd(el){moveIndicators=!moveIndicators;el.classList.toggle('on',moveIndicators);
+  localStorage.setItem('cbt_moveInd',moveIndicators?'1':'0');
+  toast('toastSettings',moveIndicators?'Indicadores activados':'Indicadores desactivados');
+  render();}
+let checkSig=true;
+function toggleCheckSig(el){checkSig=!checkSig;el.classList.toggle('on',checkSig);
+  try{localStorage.setItem('cbt_checkSig',checkSig?'1':'0')}catch(e){}
+  toast('toastSettings',checkSig?'Señal de jaque activada':'Señal de jaque desactivada');
+  render();}
+let setMin=5,setInc=0;
+function stSync(){
+  selTC=setMin+'+'+setInc;
+  localStorage.setItem('cbt_min',setMin);localStorage.setItem('cbt_inc',setInc);
+  document.getElementById('stMin').textContent=setMin;document.getElementById('stInc').textContent=setInc;
+  if(tcGrid)tcGrid.querySelectorAll('.tc').forEach(x=>x.classList.toggle('on',x.querySelector('b').textContent===selTC));
+  const tcChip=document.getElementById('tcCur'); if(tcChip)tcChip.textContent=selTC;
+  if(peerConnected&&peerRole==='host')broadcastLobbyConfig();
+  Sound.click();toast('toastSettings','Reloj por defecto: '+selTC);
+}
+function stTime(d){setMin=Math.min(120,Math.max(1,setMin+d));stSync()}
+function stInc(d){setInc=Math.min(30,Math.max(0,setInc+d));stSync()}
+function closeApp(){
+  showGameToast('Cerrando aplicación…');
+  setTimeout(()=>{try{window.close()}catch(e){document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#0B0D10;color:#8B96A5;font-family:system-ui">La app se ha cerrado. Puedes cerrar esta pestaña.</div>'}},500);
+}
+(()=>{ // restaurar ajustes
+  try{
+    const th=localStorage.getItem('cbt_theme');if(th==='dark')setBoardTheme('dark');
+    if(localStorage.getItem('cbt_lang')==='en')setLang('en');
+    const v=localStorage.getItem('cbt_vol');if(v!=null)setVolume(v);
+    if(localStorage.getItem('cbt_sound')==='0'){soundOn=false;document.getElementById('soundSw').classList.remove('on');document.getElementById('soundSw2').classList.remove('on')}
+    if(localStorage.getItem('cbt_moveInd')==='0'){moveIndicators=false;document.getElementById('moveIndSw').classList.remove('on')}
+    if(localStorage.getItem('cbt_checkSig')==='0'){checkSig=false;const csw=document.getElementById('checkSw');if(csw)csw.classList.remove('on')}
+    const col=localStorage.getItem('cbt_color');pickSide(col==='b'?'b':'w');
+    const i=localStorage.getItem('cbt_inc');if(i!=null)setInc=+i;
+    const m=localStorage.getItem('cbt_min');if(m!=null)setMin=+m;
+    if(setInc)document.getElementById('stInc').textContent=setInc;
+    if(setMin!==5)document.getElementById('stMin').textContent=setMin;
+    if(soundVol!==80){document.getElementById('volSlider').value=soundVol;document.getElementById('volLabel').textContent=soundVol+'%'}
+  }catch(e){}
+})();
+
+/* ===== partida (motor con reglas FIDE: enroque, en passant, promoción) ===== */
+const START=[['BR','BN','BB','BQ','BK','BB','BN','BR'],['BP','BP','BP','BP','BP','BP','BP','BP'],['','','','','','','',''],['','','','','','','',''],['','','','','','','',''],['','','','','','','',''],['WP','WP','WP','WP','WP','WP','WP','WP'],['WR','WN','WB','WQ','WK','WB','WN','WR']];
+let board,sel=null,lastMove=null,turn='w',history=[],wt=300,bt=300,baseTime=300,inc=0,gameOn=false,tickTimer=null,cd=null;
+let castW={K:true,Q:true},castB={K:true,Q:true},epSq=null;
+let moveList=[],replay=null;
+const files='abcdefgh';
+function sqName(r,c){return files[c]+(8-r)}
+function onBoard(r,c){return r>=0&&r<8&&c>=0&&c<8}
+function cloneBoard(b){return b.map(r=>r.slice())}
+function findKing(b,white){
+  const k=(white?'W':'B')+'K';
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++)if(b[r][c]===k)return [r,c];
+  return null;
+}
+function isAttacked(b,r,c,byWhite){
+  const pawnDir=byWhite?1:-1; // pawns of byWhite attack "upward" from their perspective => from r+pawnDir onto r? white pawns are on rows 6 moving to 0, so a white pawn at (r+1,c±1) attacks (r,c)
+  for(const dc of[-1,1]){const pr=r+pawnDir,pc=c+dc;if(onBoard(pr,pc)){const p=b[pr][pc];if(p=== (byWhite?'W':'B')+'P')return true}}
+  for(const[dr,dc] of[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]]){const nr=r+dr,nc=c+dc;if(onBoard(nr,nc)){const p=b[nr][nc];if(p=== (byWhite?'W':'B')+'N')return true}}
+  for(const dr of[-1,0,1])for(const dc of[-1,0,1])if(dr||dc){const nr=r+dr,nc=c+dc;if(onBoard(nr,nc)){const p=b[nr][nc];if(p=== (byWhite?'W':'B')+'K')return true}}
+  for(const[dr,dc] of[[1,0],[-1,0],[0,1],[0,-1]]){let nr=r+dr,nc=c+dc;while(onBoard(nr,nc)){const p=b[nr][nc];if(p){if(p[0]===(byWhite?'W':'B')&&(p[1]==='R'||p[1]==='Q'))return true;break}nr+=dr;nc+=dc}}
+  for(const[dr,dc] of[[1,1],[1,-1],[-1,1],[-1,-1]]){let nr=r+dr,nc=c+dc;while(onBoard(nr,nc)){const p=b[nr][nc];if(p){if(p[0]===(byWhite?'W':'B')&&(p[1]==='B'||p[1]==='Q'))return true;break}nr+=dr;nc+=dc}}
+  return false;
+}
+function inCheck(b,white){const k=findKing(b,white);return k?isAttacked(b,k[0],k[1],!white):false}
+function pseudoMoves(b,r,c){
+  const p=b[r][c];const out=[];if(!p)return out;const white=p[0]==='W';const t=p[1];
+  const add=(tr,tc)=>{if(onBoard(tr,tc))out.push([tr,tc])};
+  if(t==='P'){const d=white?-1:1;const start=white?6:1;
+    if(onBoard(r+d,c)&&!b[r+d][c])add(r+d,c);
+    if(r===start&&!b[r+d][c]&&onBoard(r+2*d,c)&&!b[r+2*d][c])add(r+2*d,c);
+    for(const dc of[-1,1]){const tr=r+d,tc=c+dc;if(onBoard(tr,tc)&&b[tr][tc]&&(b[tr][tc][0]==='W')!==white)add(tr,tc)}
+    // en passant: diagonal a casilla vacía objetivo
+    if(epSq&&epSq.r===r+d){for(const dc of[-1,1]){if(c+dc===epSq.c)add(epSq.r,epSq.c)}}
+  } else if(t==='N'){for(const[dr,dc] of[[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]])add(r+dr,c+dc)}
+  else if(t==='K'){for(const dr of[-1,0,1])for(const dc of[-1,0,1])if(dr||dc)add(r+dr,c+dc)}
+  else {const dirs=t==='R'?[[1,0],[-1,0],[0,1],[0,-1]]:t==='B'?[[1,1],[1,-1],[-1,1],[-1,-1]]:[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
+    for(const[dr,dc] of dirs){let tr=r+dr,tc=c+dc;while(onBoard(tr,tc)){if(!b[tr][tc])add(tr,tc);else{if((b[tr][tc][0]==='W')!==white)add(tr,tc);break}tr+=dr;tc+=dc}}}
+  return out.filter(([tr,tc])=>!b[tr][tc]||(b[tr][tc][0]==='W')!==white);
+}
+function applyMove(b,from,to,epTarget,promo){
+  const nb=cloneBoard(b);
+  const p=nb[from[0]][from[1]];
+  nb[to[0]][to[1]]=p;nb[from[0]][from[1]]='';
+  let newEp=null;
+  // el destino era la casilla de captura al paso vacía => eliminar el peón saltado
+  if(p[1]==='P'&&epTarget&&to[0]===epTarget.r&&to[1]===epTarget.c)nb[from[0]][to[1]]='';
+  // doble push: fija la casilla de captura al paso
+  if(p[1]==='P'&&Math.abs(to[0]-from[0])===2)newEp={r:(from[0]+to[0])/2,c:from[1]};
+  // enroque: mueve la torre
+  if(p[1]==='K'&&Math.abs(to[1]-from[1])===2){
+    const row=from[0];
+    if(to[1]===6){nb[row][5]=nb[row][7];nb[row][7]=''}
+    else{nb[row][3]=nb[row][0];nb[row][0]=''}
+  }
+  // promoción (auto para evaluar legalidad si no se eligió pieza)
+  if(p[1]==='P'&&(to[0]===0||to[0]===7))nb[to[0]][to[1]]=p[0]+(promo||'Q');
+  return{nb,newEp};
+}
+function legalMoves(r,c){
+  const p=board[r][c];if(!p)return [];
+  const white=p[0]==='W';const t=p[1];
+  let base=pseudoMoves(board,r,c);
+  // enroque: solo si rey en fila base, sin derechos usados, casillas libres y rey no está/atraviesa jaque
+  if(t==='K'&&!inCheck(board,white)){
+    const row=white?7:0;
+    if(r===row&&c===4){
+      const rights=white?castW:castB;
+      if(rights.K&&board[row][7]===(white?'WR':'BR')&&!board[row][5]&&!board[row][6]
+        &&!isAttacked(board,row,5,!white)&&!isAttacked(board,row,6,!white))base.push([row,6]);
+      if(rights.Q&&board[row][0]===(white?'WR':'BR')&&!board[row][1]&&!board[row][2]&&!board[row][3]
+        &&!isAttacked(board,row,3,!white)&&!isAttacked(board,row,2,!white))base.push([row,2]);
+    }
+  }
+  return base.filter(([tr,tc])=>{
+    const {nb}=applyMove(board,[r,c],[tr,tc],epSq);
+    return !inCheck(nb,white);
+  });
+}
+function allLegal(white){
+  const out=[];
+  for(let r=0;r<8;r++)for(let c=0;c<8;c++){const p=board[r][c];if(p&&(p[0]==='W')===white)legalMoves(r,c).forEach(m=>out.push({from:[r,c],to:m}))}
+  return out;
+}
+function render(){const b=document.getElementById('board');b.innerHTML='';
+  const flip=myColor==='b'; // el color del jugador local SIEMPRE queda abajo del tablero
+  for(let dr=0;dr<8;dr++)for(let dc=0;dc<8;dc++){const r=flip?7-dr:dr,c=flip?7-dc:dc;const d=document.createElement('div');d.className='sq '+(((r+c)%2)?'dark':'light');
+    const p=board[r][c];if(p)d.appendChild(pieceImg(P[p],p));
+    if(c===0){const s=document.createElement('span');s.className='coord c-r';s.textContent=8-r;d.appendChild(s)}
+    if(r===7){const s=document.createElement('span');s.className='coord c-f';s.textContent=files[c];d.appendChild(s)}
+    if(sel&&sel[0]===r&&sel[1]===c)d.classList.add('sel');
+    if(lastMove&&((lastMove[0]===r&&lastMove[1]===c)||(lastMove[2]===r&&lastMove[3]===c)))d.classList.add('last');
+    if(p&&p[1]==='K'&&((p[0]==='W')===(turn==='w'))&&isSideChecked&&checkSig) d.classList.add('check');
+    if(errSq&&errSq[0]===r&&errSq[1]===c)d.classList.add('err');
+    if(turn!==myColor)d.classList.add('locked');
+    d.onclick=()=>tap(r,c);b.appendChild(d)}
+  // Propiedad estricta: este móvil solo mueve SUS piezas (myColor). Las del rival llegan por Bluetooth.
+  const you=turn===myColor;
+  document.getElementById('youCard').classList.toggle('active',you);
+  document.getElementById('rivalCard').classList.toggle('active',!you);
+  const youState=document.getElementById('youState'), rivState=document.getElementById('rivState');
+  youState.textContent=you?(gameOn?T[lang].myTurn:T[lang].paused):T[lang].rivalTurn;
+  rivState.textContent=!you?(gameOn?T[lang].playing:T[lang].paused):T[lang].rivalTurn;
+  youState.className=you?'live':'';
+  rivState.className=!you?'live':'';
+  document.getElementById('gameStatus').innerHTML='<b>'+(turn==='w'?T[lang].white:T[lang].black)+'</b> '+T[lang].toMove+(isSideChecked?' · <span style="color:var(--red);font-weight:800">'+T[lang].check+'</span>':history.length?' · Última: '+history[history.length-1]:'')+(you?'':' · <span style="color:var(--muted)">'+T[lang].waitingBT+'</span>');
+  updateClocks();
+}
+let isSideChecked=false,errSq=null;
+function flashErr(r,c){errSq=[r,c];Sound.illegal();render();setTimeout(()=>{errSq=null;render()},550)}
+function tap(r,c){const p=board[r][c];
+  if(!gameOn||replay)return;
+  // PROPIEDAD ESTRICTA: solo puedo tocar MIS piezas (myColor).
+  // Las del rival NUNCA se seleccionan aquí: se mueven desde su móvil y llegan por Bluetooth SPP.
+  // Sin cuadros de diálogo: solo parpadeo sutil de la casilla.
+  if(p&&p[0].toLowerCase()!==myColor){flashErr(r,c);return}
+  if(turn!==myColor){return}
+  if(sel){
+    const mv=legalMoves(sel[0],sel[1]).find(([tr,tc])=>tr===r&&tc===c);
+    if(mv){doMove(sel[0],sel[1],r,c);return}
+    if(p){sel=[r,c];render();markDots(r,c);return}
+    sel=null;render();flashErr(r,c);return;
+  }
+  if(p){sel=[r,c];render();markDots(r,c)}
+}
+function doMove(fr,fc,tr,tc){
+  // Guardia: solo se ejecuta una jugada LEGAL (auto-validación contra el motor).
+  // Nunca se aplica nada que no exista como movimiento legal.
+  if(!legalMoves(fr,fc).some(([r2,c2])=>r2===tr&&c2===tc)){flashErr(fr,fc);return}
+  const piece=board[fr][fc];
+  const isCapture=board[tr][tc]||(epSq&&epSq.r===tr&&epSq.c===tc&&piece[1]==='P');
+  // promoción: pedir pieza (siempre con diálogo centrado)
+  if(piece[1]==='P'&&(tr===0||tr===7)){
+    const col=piece[0],svgKey=n=>col+n;
+    showModal(T[lang].promo,T[lang].choosePiece,null,[
+      {svg:P[svgKey('Q')],label:'Dama',fn:()=>finishMove(fr,fc,tr,tc,'Q',isCapture)},
+      {svg:P[svgKey('R')],label:'Torre',fn:()=>finishMove(fr,fc,tr,tc,'R',isCapture)},
+      {svg:P[svgKey('B')],label:'Alfil',fn:()=>finishMove(fr,fc,tr,tc,'B',isCapture)},
+      {svg:P[svgKey('N')],label:'Caballo',fn:()=>finishMove(fr,fc,tr,tc,'N',isCapture)}
+    ]);
+    return;
+  }
+  finishMove(fr,fc,tr,tc,null,isCapture);
+}
+function finishMove(fr,fc,tr,tc,promo,isCapture){
+  // Sólo se aplica una jugada si hay partida activa y la jugada es LEGAL y manual.
+  // Nunca se aplica movimiento automático ni ilegal.
+  if(!gameOn||replay)return;
+  const piece=board[fr][fc];
+  const rightsBefore={...castW,...castB};
+  let san=piece[1]+(isCapture?'x':'')+sqName(tr,tc);
+  if(promo)san+='='+(promo==='N'?'C':promo==='B'?'A':promo==='Q'?'D':'T');
+  // resolver
+  const {nb}=applyMove(board,[fr,fc],[tr,tc],epSq,promo);
+  board=nb;
+  // derechos de enroque
+  if(piece[1]==='K'){if(piece[0]==='W'){castW.K=castW.Q=false}else{castB.K=castB.Q=false}}
+  const ruin=(rw,cf)=>{if(rw===7&&cf===7)castW.K=false;if(rw===7&&cf===0)castW.Q=false;if(rw===0&&cf===7)castB.K=false;if(rw===0&&cf===0)castB.Q=false};
+  ruin(fr,fc);ruin(tr,tc);
+  sel=null;lastMove=[fr,fc,tr,tc];history.push(san);
+  moveList.push({f:[fr,fc],t:[tr,tc],p:promo||null,ms:(turn==='w'?wt:bt)});
+  // Sonido SOLO de mis piezas. Las jugadas del rival no suenan en mi móvil.
+  if(piece[0].toLowerCase()===myColor){if(isCapture)Sound.capture();else Sound.move()}
+  if(piece[1]==='P'&&Math.abs(tr-fr)===2)epSq={r:(fr+tr)/2,c:fc};else epSq=null;
+  // incremento del reloj para quien movió
+  if(inc>0){if(turn==='w')wt+=inc;else bt+=inc}
+  turn=turn==='w'?'b':'w';
+  isSideChecked=inCheck(board,turn==='w');
+  render();
+  const localWonTheGame = checkEnd();
+  // Broadcast de la jugada al rival (SPP real; aquí BroadcastChannel entre pestañas)
+  peerSend({t:'MOVE',f:[fr,fc],to:[tr,tc],p:promo||null,san:san});
+  // Sonido de check SOLO si la jugada local lo provocó (ya lo maneja checkEnd)
+}
+function checkEnd(){
+  const whiteNow=turn==='w';
+  const any=allLegal(whiteNow).length>0;
+  if(!any){
+    gameOn=false;if(tickTimer)clearInterval(tickTimer);
+    if(isSideChecked){
+      Sound.mate();window.__lastResult={w:(whiteNow?'b':'w')===myColor};savePgn((whiteNow?T[lang].black:T[lang].white)+' '+T[lang].mateWin);
+      showModal(T[lang].mate,(whiteNow?T[lang].black:T[lang].white)+' '+T[lang].mateWin,[
+        {t:T[lang].newGame,cls:'primary',fn:startGame},{t:T[lang].exit,fn:()=>go('home')}]);
+    }else{
+      showGameToast(T[lang].staleToast);window.__lastResult={w:null};savePgn(T[lang].stalemate);
+      showModal(T[lang].stalemate,T[lang].stalemateMsg,[
+        {t:T[lang].newGame,cls:'primary',fn:startGame},{t:T[lang].exit,fn:()=>go('home')}]);
+    }
+    return true;
+  }
+  if(isSideChecked)Sound.check();
+  return false;
+}
+function markDots(r,c){
+  if(!moveIndicators)return;
+  const b=document.getElementById('board');
+  b.querySelectorAll('.dot,.capring').forEach(e=>e.remove());
+  const flip=myColor==='b';
+  legalMoves(r,c).forEach(([tr,tc])=>{
+    const dr=flip?7-tr:tr, dc=flip?7-tc:tc;
+    const i=dr*8+dc,sq=b.children[i];
+    const m=document.createElement('div');m.className=board[tr][tc]?'capring':'dot';sq.appendChild(m)
+  })
+}
+function fmtClock(ms){if(baseTime===0)return'∞';ms=Math.max(0,Math.round(ms));return Math.floor(ms/60)+':'+String(ms%60).padStart(2,'0')}
+function updateClocks(){
+  const myT=myColor==='w'?wt:bt, rivT=myColor==='w'?bt:wt;
+  document.getElementById('youClock').textContent=fmtClock(myT);
+  document.getElementById('rivClock').textContent=fmtClock(rivT);
+  document.getElementById('youClock').classList.toggle('low',baseTime>0&&myT<=30);
+  document.getElementById('rivClock').classList.toggle('low',baseTime>0&&rivT<=30);
+  const fy=document.getElementById('fsYouClock'), fr=document.getElementById('fsRivClock');
+  const you=turn===myColor;
+  if(fy){fy.textContent=fmtClock(myT);fy.classList.toggle('active',you);fy.classList.toggle('low',baseTime>0&&myT<=30)}
+  if(fr){fr.textContent=fmtClock(rivT);fr.classList.toggle('active',!you);fr.classList.toggle('low',baseTime>0&&rivT<=30)}
+  if(baseTime>0){
+    document.getElementById('youBar').style.width=Math.max(0,Math.min(100,myT/baseTime*100))+'%';
+    document.getElementById('rivBar').style.width=Math.max(0,Math.min(100,rivT/baseTime*100))+'%';
+  }
+}
+function startGame(){
+  if(peerConnected&&peerRole!=='host'){showGameToast('Sólo el anfitrión puede iniciar la partida');return}
+  if(!peerConnected){
+    toast('toastLobby','Conéctate con el rival primero (dos pestañas)');
+    return;
+  }
+  // Color aleatorio por defecto: se decide al comenzar (anfitrión y rival reciben orden opuesta).
+  if(!colorChosen){
+    myColor=Math.random()<0.5?'w':'b';
+    pickSideVisual(myColor);
+  }
+  peerSend({t:'START',color:myColor,min:setMin,inc:setInc,hostName:myName});
+  gameMeta={myName:myName,
+    rivalName:peerName||'Rival',
+    myColor:myColor,t:setMin+'+'+setInc};
+  selTC=setMin+'+'+setInc; gameMeta.t=selTC;
+  const m=String(selTC).match(/^(\d+)\+(\d+)$/);
+  const secs=m?(+m[1]*60):0, ip=m?(+m[2]):0;
+  const nm=gameMeta.myName;
+  document.getElementById('youName').textContent=nm;
+  document.getElementById('rivName').textContent=gameMeta.rivalName;
+  const _rivAv=document.getElementById('rivAvatar'); if(_rivAv&&!peerProfile)_rivAv.textContent=(gameMeta.rivalName||'R').charAt(0).toUpperCase();
+  const tcCur=document.getElementById('tcCur'); if(tcCur)tcCur.textContent=selTC;
+  renderPhoto();
+  applyBadges();
+  moveList=[];replay=null;
+  document.getElementById('replayBar').style.display='none';
+  inc=ip; baseTime=secs;
+  board=START.map(r=>r.slice());sel=null;lastMove=null;turn='w';history=[];
+  castW={K:true,Q:true};castB={K:true,Q:true};epSq=null;isSideChecked=false;errSq=null;
+  wt=baseTime||300;bt=baseTime||300;gameOn=false;
+  document.getElementById('pauseBtn').textContent=T[lang].pause;
+  stopHostHere();
+  render();if(tickTimer)clearInterval(tickTimer);go('game');requestAnimationFrame(fitBoard);startCountdown();
+}
+let cdTimer=null;
+function startCountdown(){
+  if(cdTimer){clearInterval(cdTimer);cdTimer=null}
+  let cdLeft=3;
+  const st=document.getElementById('gameStatus');
+  const renderCd=()=>{ st.innerHTML='<b>'+(turn==='w'?T[lang].white:T[lang].black)+'</b> '+T[lang].toMove+' · '+(T[lang].getReady||'Comienza');
+    if(cdLeft===3)Lx.play('countdown3',1); else if(cdLeft===2)Lx.play('countdown2',1); else if(cdLeft===1)Lx.play('countdown1',1); };
+  renderCd();
+  cdTimer=setInterval(()=>{
+    cdLeft--;
+    if(cdLeft>0){renderCd();return}
+    clearInterval(cdTimer); cdTimer=null;
+    gameOn=true; startTicking(); checkEnd();
+  },1000);
+}
+function startTicking(){
+  if(tickTimer)clearInterval(tickTimer);
+  tickTimer=setInterval(()=>{
+    if(!gameOn)return;
+    if(baseTime>0){
+      const side=turn;
+      const before=turn==='w'?wt:bt;
+      if(turn==='w')wt=Math.max(0,wt-1);else bt=Math.max(0,bt-1);
+      const after=turn==='w'?wt:bt;
+      // Aviso de tiempo bajo (sonido LowTime oficial de Lichess), sólo para quien mueve
+      if(turn===myColor && after>=1 && after<=10 && after<before) Lx.play('lowtime',0.9);
+    }
+    if(peerRole==='host'&&peerConnected)peerSend({t:'CLOCK',wt:wt,bt:bt});
+    if(baseTime>0&&(wt<=0||bt<=0)){
+      const loser=wt<=0?'w':'b';
+      if(peerRole==='host')peerSend({t:'END',loser:loser,reason:'timeout'});
+      finishByTimeout(loser);
+      return;
+    }
+    updateClocks();
+  },1000);
+}
+function tick(){startTicking()}
+function act(kind){
+  if(kind==='pause'){gameOn=!gameOn;document.getElementById('pauseBtn').textContent=gameOn?T[lang].pause:T[lang].resume;render();peerSend({t:'PAUSE',paused:!gameOn,by:myName});showGameToast(gameOn?T[lang].resumedMsg:T[lang].pausedMsg);Sound.click();return}
+  if(kind==='draw'){Sound.offer();peerSend({t:'DRAW_OFFER',by:myName});showGameToast('Oferta de tablas enviada…');return}
+  if(kind==='resign'){
+    showModal(T[lang].resignT,T[lang].resignC,[
+      {t:T[lang].cancel,cls:'ghost'},
+      {t:T[lang].resignB,cls:'danger',fn:()=>{
+        gameOn=false;if(tickTimer)clearInterval(tickTimer);
+        peerSend({t:'RESIGN',by:myName,loserColor:myColor});
+        Sound.lose&&Sound.lose();window.__lastResult={w:false};savePgn(T[lang].resignedT);
+        showModal(T[lang].resignedT,T[lang].resignedM,[
+          {t:T[lang].newGame,cls:'primary',fn:startGame},{t:T[lang].backHome,fn:()=>go('home')}]);
+      }}]);
+  }
+}
+function showGameToast(m){const t=document.getElementById('toastGame');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200)}
+/* ===== logo CHESS-X dibujado con canvas ===== */
+(function(){
+  const c=document.getElementById('logoCanvas'); if(!c)return;
+  const ctx=c.getContext('2d'); const s=100;
+  ctx.clearRect(0,0,s,s);
+  const rr=(x,y,w,h,r)=>{ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()};
+  ctx.fillStyle='#11161D'; rr(0,0,s,s,26); ctx.fill();
+  ctx.strokeStyle='#1E2630'; ctx.lineWidth=2; rr(1,1,s-2,s-2,25); ctx.stroke();
+  const KNIGHT="M22 10c10.5 1 16.5 8 16 29H15c0-9 10-6.5 8-21z M24 18c.38 2.91-5.55 7.37-8 9-3 2-2.82 4.34-5 4-1.042-.94 1.41-3.04 0-3-1 0 .19 1.23-1 2-1 0-4.003 1-4-4 0-2 6-12 6-12s1.89-1.9 2-3.5c-.73-.994-.5-2-.5-3 1-1 3 2.5 3 2.5h2s.78-1.992 2.5-3c1 0 1 3 1 3z";
+  ctx.save(); ctx.translate(13,13); ctx.scale(1.58,1.58);
+  ctx.fillStyle='#E2B94E'; ctx.fill(new Path2D(KNIGHT)); ctx.restore();
+  ctx.strokeStyle='#E2B94E'; ctx.lineWidth=8.5; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(67,69); ctx.lineTo(88,90); ctx.moveTo(88,69); ctx.lineTo(67,90); ctx.stroke();
+})();
+board=START.map(r=>r.slice());render();
+</script>
+</body></html>

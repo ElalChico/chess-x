@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">CHESS-X</string>
+    <string name="home_title">CHESS-X</string>
+    <string name="create_game">Crear partida</string>
+    <string name="search_game">Buscar partida</string>
+    <string name="your_name">Tu nombre</string>
+    <string name="time_control">Control de tiempo</string>
+    <string name="waiting_connection">Esperando conexión…</string>
+    <string name="discoverable_msg">Haz descubrible este dispositivo (300s)</string>
+    <string name="scanning">Escaneando dispositivos…</string>
+    <string name="connect">Conectar</string>
+    <string name="start_game">Comenzar partida</string>
+    <string name="pause">Pausar</string>
+    <string name="resume">Reanudar</string>
+    <string name="offer_draw">Ofrecer tablas</string>
+    <string name="resign">Rendirse</string>
+</resources>

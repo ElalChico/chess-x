@@ -1,0 +1,29 @@
+*.iml
+.gradle/
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+**/build/
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+*.apk
+*.aab
+
+# ---- Firma de release: NUNCA se sube al repo ----
+keystore/
+keystore.properties
+
+# ---- APKs sueltos de versiones antiguas (no se suben) ----
+/chess-bt-A.44.apk
+/chess-x-X.45.apk
+
+# ---- Release público: SÍ se sube (gana al *.apk de arriba) ----
+!release/chess-x-X.46.apk
+!release/chess-x-X.46-debug.apk
