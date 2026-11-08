@@ -409,7 +409,8 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
             lobby = _ui.value.lobby.copy(
                 gameStarted = true, connected = true,
                 localColor = myColor, remoteColor = myColor.opposite(),
-                timeMs = timeMs, incrementMs = incMs, colorRandom = false
+                timeMs = timeMs, incrementMs = incMs, colorRandom = false,
+                isHost = _ui.value.lobby.isHost // preserve host role
             )
         )
         if (isHost) {
@@ -435,7 +436,7 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
             localColor = local, remoteColor = hostColor,
             localName = localName, remoteName = msg.hostName.ifBlank { "Anfitrión" },
             isLocalTurn = local == Color.WHITE,
-            lobby = _ui.value.lobby.copy(gameStarted = true, connected = true, timeMs = msg.timeMs, incrementMs = msg.incrementMs),
+            lobby = _ui.value.lobby.copy(gameStarted = true, connected = true, timeMs = msg.timeMs, incrementMs = msg.incrementMs, isHost = false),
             gameEnd = null, paused = false, countdown = null, promotionPending = null,
             inCheck = false, checkKing = null, selection = BoardSelection(null),
             history = emptyList()
@@ -593,6 +594,7 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
                     localColor = hostColor.opposite(),
                     remoteColor = hostColor,
                     lobby = _ui.value.lobby.copy(
+                        isHost = false,
                         timeMs = msg.timeMs, incrementMs = msg.incrementMs,
                         remoteName = msg.hostName,
                         localColor = hostColor.opposite(),

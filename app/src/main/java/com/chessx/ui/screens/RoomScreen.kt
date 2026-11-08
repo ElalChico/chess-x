@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -260,37 +261,41 @@ fun RoomScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(72.dp)
-                    .background(if (canStart) Color(0xFF0F0F0F) else Color(0xFF111111), RoundedCornerShape(16.dp))
-                    .border(1.5.dp, if (canStart) Gold else Color(0xFF232323), RoundedCornerShape(16.dp))
+                    .height(88.dp)
+                    .background(
+                        if (canStart) Brush.horizontalGradient(listOf(Color(0xFF1A1A14), Color(0xFF0F0F0F)))
+                        else Brush.horizontalGradient(listOf(Color(0xFF141414), Color(0xFF111111))),
+                        RoundedCornerShape(20.dp)
+                    )
+                    .border(2.dp, if (canStart) Gold else Color(0xFF2A2A2A), RoundedCornerShape(20.dp))
                     .clickable(enabled = canStart) { if (canStart) onStartGame() }
-                    .padding(horizontal = 18.dp),
+                    .padding(horizontal = 20.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Box(
                         Modifier
-                            .size(40.dp)
-                            .background(Color(0xFF1A1A14), RoundedCornerShape(12.dp))
-                            .border(1.dp, if (canStart) Color(0xFF3A3524) else Color(0xFF26261F), RoundedCornerShape(12.dp)),
+                            .size(48.dp)
+                            .background(Color(0xFF1A1A14), RoundedCornerShape(14.dp))
+                            .border(1.5.dp, if (canStart) Color(0xFF3A3524) else Color(0xFF26261F), RoundedCornerShape(14.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         if (canStart) {
-                            Text("GO", fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
+                            Text("▶", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
                         } else {
-                            CircularProgressIndicator(color = Gold, modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                            CircularProgressIndicator(color = Gold, modifier = Modifier.size(20.dp), strokeWidth = 3.dp)
                         }
                     }
                     Column {
                         Text(
                             if (canStart) "Comenzar partida" else "Esperando al rival…",
-                            fontSize = 17.sp,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = if (canStart) Gold else Muted
                         )
                         Text(
-                            if (canStart) "Cuenta regresiva 3-2-1 en los dos móviles al iniciar" else "Pulsa cuando el rival se conecte",
-                            fontSize = 11.sp,
+                            if (canStart) "Cuenta regresiva 3-2-1 sincronizada en ambos móviles" else "Pulsa cuando el rival se conecte",
+                            fontSize = 12.sp,
                             color = if (canStart) Color(0xFFA8975E) else Color(0xFF555A66),
                             fontWeight = FontWeight.SemiBold,
                             maxLines = 1

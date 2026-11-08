@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,9 +16,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.chessx.core.BoardSnapshot
+import com.chessx.core.ChessEngine
+import com.chessx.core.Color as ChessColor
+import com.chessx.core.Piece
+import com.chessx.core.PieceType
 import com.chessx.data.BtState
 import com.chessx.data.DiscoveredDevice
 import com.chessx.data.RemoteProfile
+import com.chessx.ui.components.ChessBoard
+import com.chessx.ui.components.BoardSelection
 
 private val Bg = Color(0xFF0B0D10)
 private val Card = Color(0xFF12141A)
@@ -74,6 +82,81 @@ fun ConnectScreen(
             color = Muted, fontSize = 12.5.sp, lineHeight = 17.sp
         )
         error?.let { Text(it, color = Red, fontSize = 12.sp, modifier = Modifier.padding(top = 6.dp)) }
+
+        Spacer(Modifier.height(12.dp))
+
+        // ===== TABLERO DE PREVISTA (solo lectura) =====
+        // Siempre visible, muestra posición inicial o última conocida
+        val previewEngine = remember { ChessEngine() }
+        val previewSnapshot = previewEngine.snapshot
+        val previewSelection = BoardSelection(null)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(0.6f) // Peso para que ocupe espacio proporcional
+                .aspectRatio(1f)
+                .background(Color(0xFF0E1318), RoundedCornerShape(16.dp))
+                .border(1.dp, Line, RoundedCornerShape(16.dp))
+        ) {
+            ChessBoard(
+                snapshot = previewSnapshot,
+                perspective = ChessColor.WHITE,
+                selection = previewSelection,
+                onSquareTap = { },
+                theme = com.chessx.data.BoardTheme.CLASSIC,
+                showMoveIndicators = false,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(4.dp)
+            )
+            // Overlay de estado de conexión
+            if (btState != BtState.CONNECTED) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xAA0B0D10), RoundedCornerShape(16.dp))
+                        .clickable { },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        when (btState) {
+                            BtState.WAITING_HOST -> {
+                                Text("⌛", fontSize = 48.sp)
+                                Text("Esperando conexión…", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
+                                Text("El invitado debe pulsar «Unirse a partida» y seleccionar este dispositivo", color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
+                            }
+                            BtState.SCANNING -> {
+                                Text("🔍", fontSize = 48.sp)
+                                Text("Buscando anfitrión…", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
+                                Text("El anfitrión debe estar en «Crear partida» con Bluetooth visible", color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
+                            }
+                            BtState.CONNECTING -> {
+                                CircularProgressIndicator(color = Gold, modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
+                                Text("Conectando…", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
+                            }
+                            BtState.DISCONNECTED -> {
+                                Text("⚠️", fontSize = 48.sp)
+                                Text("Conexión perdida", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Red)
+                                Text("Reintentando automáticamente (hasta 5 veces)…", color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
+                            }
+                            BtState.ERROR -> {
+                                Text("❌", fontSize = 48.sp)
+                                Text("Error de conexión", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Red)
+                                Text("Revisa permisos de Bluetooth y reintenta", color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
+                            }
+                            else -> {
+                                Text("📱", fontSize = 48.sp)
+                                Text("Sin rival conectado", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
+                                Text("Elige tu rol abajo para crear o unirte a una partida", color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         Spacer(Modifier.height(12.dp))
 
@@ -158,7 +241,7 @@ fun ConnectScreen(
             color = Muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp
         )
 
-        LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        LazyColumn(modifier = Modifier.fillMaxWidth().weight(0.4f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             if (devices.isEmpty()) {
                 item {
                     Text(

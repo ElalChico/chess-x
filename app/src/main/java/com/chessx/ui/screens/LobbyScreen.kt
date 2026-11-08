@@ -25,6 +25,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.PopupProperties
 import com.chessx.data.GameRecord
 import com.chessx.data.LobbyState
 import com.chessx.ui.components.PhotoCropDialog
@@ -183,9 +185,10 @@ fun LobbyScreen(
 
         // Name field
         SectionLabel("TU NOMBRE")
+        var hasChanges by remember { mutableStateOf(false) }
         OutlinedTextField(
             value = nameText,
-            onValueChange = { if (it.length <= 18) { nameText = it; onNameChange(it) } },
+            onValueChange = { if (it.length <= 18) { nameText = it; onNameChange(it); hasChanges = true } },
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
@@ -196,6 +199,9 @@ fun LobbyScreen(
                 focusedContainerColor = Color(0xFF0F141B), unfocusedContainerColor = Color(0xFF0F141B)
             )
         )
+        if (hasChanges) {
+            Text("✓ Nombre guardado automáticamente", color = Green, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp, start = 4.dp))
+        }
 
         // Acceso a la sala (conectado) o puerta de emparejamiento
         if (remoteName.isBlank()) {
