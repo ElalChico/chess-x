@@ -30,6 +30,9 @@ import com.chessx.data.formatClock
 import com.chessx.ui.UiGameState
 import com.chessx.ui.components.ChessBoard
 import com.chessx.ui.components.BoardSelection
+import com.chessx.ui.components.GameEndDialog
+import com.chessx.ui.components.PromotionPieceDialog
+import com.chessx.ui.components.TournamentEndDialog
 
 private val Bg = Color(0xFF0B0D10)
 private val Card = Color(0xFF171D25)
@@ -63,7 +66,13 @@ fun GameScreen(
     onPromotion: (PieceType) -> Unit,
     onCancelPromotion: () -> Unit,
     onToggleSound: () -> Unit,
-    onDisconnect: () -> Unit
+    onDisconnect: () -> Unit,
+    onNewGameSame: () -> Unit = {},
+    onNewGameRandom: () -> Unit = {},
+    onTournamentNext: () -> Unit = {},
+    onBackToRoom: () -> Unit = {},
+    onGameEndDismiss: () -> Unit = {},
+    onNewTournament: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -216,20 +225,10 @@ fun GameScreen(
         }
 
         ui.promotionPending?.let {
-            AlertDialog(
-                onDismissRequest = onCancelPromotion,
-                title = { Text("Promoción", color = Text1) },
-                text = { Text("Elige pieza de promoción", color = Text1) },
-                confirmButton = {
-                    Row {
-                        TextButton(onClick = { onPromotion(PieceType.QUEEN) }) { Text("Dama", color = Gold) }
-                        TextButton(onClick = { onPromotion(PieceType.ROOK) }) { Text("Torre") }
-                        TextButton(onClick = { onPromotion(PieceType.BISHOP) }) { Text("Alfil") }
-                        TextButton(onClick = { onPromotion(PieceType.KNIGHT) }) { Text("Caballo") }
-                    }
-                },
-                dismissButton = { TextButton(onClick = onCancelPromotion) { Text("Cancelar") } },
-                containerColor = Card
+            PromotionPieceDialog(
+                localColor = ui.localColor,
+                onPromote = onPromotion,
+                onCancel = onCancelPromotion
             )
         }
 
@@ -254,12 +253,29 @@ fun GameScreen(
         }
 
         ui.gameEnd?.let { end ->
-            AlertDialog(
-                onDismissRequest = {},
-                title = { Text("Fin de partida", color = Text1) },
-                text = { Text(end.message + "\n\nMotivo: ${end.reason}", color = Text1) },
-                confirmButton = { TextButton(onClick = onDisconnect) { Text("Salir", color = Gold) } },
-                containerColor = Card
+            GameEndDialog(
+                end = end,
+                isHost = ui.lobby.isHost,
+                tournamentActive = ui.tournament.active && !ui.tournament.finished,
+                tournamentFinished = ui.tournament.finished,
+                onNewGameSame = onNewGameSame,
+                onNewGameRandom = onNewGameRandom,
+                onTournamentNext = onTournamentNext,
+                onBackToRoom = onBackToRoom,
+                onDismiss = onGameEndDismiss
+            )
+        }
+
+        if (ui.tournament.finished && !ui.tournament.active) {
+            TournamentEndDialog(
+                totalGames = ui.tournament.totalGames,
+                localWins = ui.tournament.localWins,
+                remoteWins = ui.tournament.remoteWins,
+                draws = ui.tournament.draws,
+                timeControl = if (ui.tournament.config.timeMs == 0L) "Ilimitado" else "${ui.tournament.config.timeMs / 60000} + ${ui.tournament.config.incrementMs / 1000}",
+                onNewTournament = onNewTournament,
+                onBackToRoom = onBackToRoom,
+                onDismiss = onGameEndDismiss
             )
         }
     }

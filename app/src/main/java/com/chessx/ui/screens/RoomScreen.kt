@@ -27,8 +27,6 @@ import com.chessx.data.LobbyState
 import com.chessx.data.PredefinedControls
 import com.chessx.data.RemoteProfile
 import com.chessx.R
-import com.chessx.data.TournamentConfig
-import com.chessx.ui.GameViewModel
 
 private val Bg = Color(0xFF0B0D10)
 private val Card = Color(0xFF12141A)
@@ -58,6 +56,7 @@ fun RoomScreen(
     onColorPick: (ChessColor) -> Unit,
     onRandomColor: () -> Unit,
     onStartGame: () -> Unit,
+    onStartTournament: (Int) -> Unit = {},
     onBack: () -> Unit
 ) {
     val isHost = lobby.isHost
@@ -182,6 +181,77 @@ fun RoomScreen(
             ChecklistItem("Reloj", clockLabel, true)
             ChecklistItem("Color", colorLabel, true)
             ChecklistItem("Rival", if (rivalOk) remoteName.take(10) else "esperando", rivalOk)
+        }
+
+        // ===== Torneo (solo anfitrión): N partidas seguidas, colores alternos =====
+        if (isHost) {
+            var games by remember { mutableIntStateOf(4) }
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                SectionLabel("MODO TORNEO")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Card, RoundedCornerShape(14.dp))
+                        .border(1.dp, Line, RoundedCornerShape(14.dp))
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Stepper("Partidas", games, 2, 6, Modifier.weight(1f)) { games = it }
+                    Column(Modifier.weight(2f)) {
+                        Text(
+                            "$games partidas seguidas",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Text1
+                        )
+                        Text(
+                            "Colores alternos · resultados separados",
+                            fontSize = 10.sp,
+                            color = Muted
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp)
+                        .background(if (rivalOk) Color(0xFF0F0F0F) else Color(0xFF111111), RoundedCornerShape(14.dp))
+                        .border(1.2.dp, if (rivalOk) Gold else Color(0xFF232323), RoundedCornerShape(14.dp))
+                        .clickable(enabled = rivalOk) { onStartTournament(games) }
+                        .padding(horizontal = 16.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(
+                            Modifier
+                                .size(36.dp)
+                                .background(Color(0xFF1A1A14), RoundedCornerShape(11.dp))
+                                .border(1.dp, if (rivalOk) Color(0xFF3A3524) else Color(0xFF26261F), RoundedCornerShape(11.dp)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("T", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = if (rivalOk) Gold else Color(0xFF6B6244))
+                        }
+                        Column {
+                            Text(
+                                "Crear torneo",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (rivalOk) Gold else Muted
+                            )
+                            Text(
+                                if (rivalOk) "Primera partida con cuenta 3-2-1" else "Esperando al rival…",
+                                fontSize = 10.sp,
+                                color = if (rivalOk) Color(0xFFA8975E) else Color(0xFF555A66),
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // ===== Comenzar — SOLO anfitrión =====

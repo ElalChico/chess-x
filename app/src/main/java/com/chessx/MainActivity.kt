@@ -240,6 +240,7 @@ fun ChessApp(
                     onColorPick = { color -> vm.setLocalColor(color) },
                     onRandomColor = { vm.setRandomColor() },
                     onStartGame = { vm.startGameAsHost() },
+                    onStartTournament = { games -> vm.startTournament(games, ui.lobby.timeMs, ui.lobby.incrementMs) },
                     onBack = { screen = Screen.HOME; vm.disconnect() }
                 )
 
@@ -279,7 +280,13 @@ fun ChessApp(
                     onPromotion = vm::confirmPromotion,
                     onCancelPromotion = vm::cancelPromotion,
                     onToggleSound = { prefs.setSoundEnabled(!prefs.soundEnabled) },
-                    onDisconnect = { fullscreen = false; vm.disconnect(); screen = Screen.HOME }
+                    onDisconnect = { fullscreen = false; vm.disconnect(); screen = Screen.HOME },
+                    onNewGameSame = { vm.requestNewGame("same") },
+                    onNewGameRandom = { vm.requestNewGame("random") },
+                    onTournamentNext = { vm.requestNewGame("tournament") },
+                    onBackToRoom = { vm.backToRoom() },
+                    onGameEndDismiss = { },
+                    onNewTournament = { screen = Screen.ROOM }
                 )
 
                 Screen.SETTINGS -> SettingsScreen(
