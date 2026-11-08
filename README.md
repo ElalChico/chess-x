@@ -66,4 +66,14 @@ app/src/main/java/com/chessx/
 ---
 
 Hecho por **Elal Chico** · CHESS-X
-Uso personal.
+
+## Licencia
+
+Código bajo **MIT** (`LICENSE`): puedes modificarlo, contribuir y redistribuirlo,
+incluso comercialmente, siempre que mantengas el aviso de copyright
+`© 2026 Elal Chico`.
+
+Las contribuciones son bienvenidas: abre un issue o manda tu pull request.
+
+Nota: las piezas (cburnett SVG) y los sonidos incluidos conservan sus licencias
+originales y se mantienen atribuidos a sus autores.
