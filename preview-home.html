@@ -606,7 +606,7 @@ body.fs #s-game .actions .a-btn.ghost{display:none}
       <button class="on" data-s="home" onclick="go('home')"><svg viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v8a2 2 0 0 1-2 2h-4v-5h-4v5H6a2 2 0 0 1-2-2z"/></svg>Inicio</button>
       <button data-s="connect" onclick="go('connect');mode='host';syncMode()"><svg viewBox="0 0 24 24"><path d="M4 12a8.5 8.5 0 0 1 16 0M7.5 15.5a5 5 0 0 1 9 0M12 19h.01"/></svg>Conectar</button>
       <button data-s="lobby" onclick="go('lobby')"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 11l3 3 4.5-5"/></svg>Perfil</button>
-      <button data-s="game" onclick="initPreviewGame();go('game')"><svg viewBox="0 0 24 24"><path d="M6 4h12v4a7 7 0 0 1-14 0z" transform="translate(0 .5)"/><path d="M9 20h6M10 20v-2h4v2"/></svg>Partida</button>
+      <button data-s="game" id="navPartidaBtn" onclick="navToGame()"><svg viewBox="0 0 24 24"><path d="M6 4h12v4a7 7 0 0 1-14 0z" transform="translate(0 .5)"/><path d="M9 20h6M10 20v-2h4v2"/></svg>Partida</button>
       <button data-s="settings" onclick="go('settings')"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M2.8 12h3M18.2 12h3M5.5 5.5l2.1 2.1M16.4 16.4l2.1 2.1M18.5 5.5l-2.1 2.1M7.6 16.4l-2.1 2.1"/></svg>Ajustes</button>
     </nav>
   </div>
@@ -674,6 +674,11 @@ function go(s){
     startTicking();
   }
   requestAnimationFrame(fitBoard);
+}
+function navToGame(){
+  // Initialize preview game if needed, then navigate to game screen
+  if(!gameOn || board[0][0]===null) initPreviewGame();
+  go('game');
 }
 function toggleFullscreen(){
   const on=!document.body.classList.contains('fs');
