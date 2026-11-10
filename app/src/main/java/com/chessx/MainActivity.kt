@@ -411,25 +411,12 @@ fun ChessApp(
                         }
                         screen = Screen.PROFILE
                     }
-                    Screen.ROOM -> {
-                        fullscreen = false
-                        if (!prefs.profileConfigured) {
-                            profileNextScreen = Screen.ROOM
-                            screen = Screen.PROFILE
-                        } else {
-                            if (!ui.lobby.connected && btState == BtState.IDLE && !isHostMode) {
-                                isHostMode = true
-                                vm.setIsHost(true)
-                            }
-                            screen = Screen.ROOM
-                        }
-                    }
                     Screen.GAME -> {
                         fullscreen = false
                         screen = when {
                             ui.lobby.gameStarted -> Screen.GAME
-                            isHostMode -> Screen.ROOM
                             btState == BtState.CONNECTED -> Screen.ROOM
+                            isHostMode -> Screen.ROOM
                             else -> Screen.CONNECT
                         }
                     }
@@ -437,6 +424,7 @@ fun ChessApp(
                         fullscreen = false
                         screen = Screen.SETTINGS
                     }
+                    else -> { /* ROOM not in bottom nav */ }
                 }
             })
         }
@@ -474,10 +462,9 @@ private data class NavEntry(val screen: Screen, val labelEs: String, val labelEn
 private fun BottomNav(current: Screen, isEn: Boolean, onSelect: (Screen) -> Unit) {
     val entries = listOf(
         NavEntry(Screen.HOME, "Inicio", "Home", Icons.Filled.Home),
-        NavEntry(Screen.PROFILE, "Perfil", "Profile", Icons.Filled.Person),
-        NavEntry(Screen.ROOM, "Partida", "Game", Icons.Filled.Tune),
+        NavEntry(Screen.GAME, "Partida", "Game", Icons.Filled.PlayArrow),
         NavEntry(Screen.CONNECT, "Conectar", "Connect", Icons.Filled.Search),
-        NavEntry(Screen.GAME, "Tablero", "Board", Icons.Filled.PlayArrow),
+        NavEntry(Screen.PROFILE, "Perfil", "Profile", Icons.Filled.Person),
         NavEntry(Screen.SETTINGS, "Ajustes", "Settings", Icons.Filled.Settings)
     )
     Column(Modifier.fillMaxWidth()) {
