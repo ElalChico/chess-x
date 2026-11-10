@@ -20,10 +20,15 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +41,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -257,34 +265,50 @@ fun ChessApp(
         // Diálogo de actualización automática al inicio
         if (showUpdateDialog && pendingUpdateResult != null) {
             val result = pendingUpdateResult!!
-            androidx.compose.material3.AlertDialog(
+            Dialog(
                 onDismissRequest = { showUpdateDialog = false },
-                title = { Text("Actualización disponible", color = Color(0xFFEEF1F5), fontWeight = FontWeight.ExtraBold, fontSize = 18.sp) },
-                text = {
-                    Column(Modifier.padding(top = 8.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                properties = DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                androidx.compose.material3.Card(
+                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = Color(0xFF12141A),
+                        contentColor = Color(0xFFEEF1F5)
+                    ),
+                    shape = RoundedCornerShape(16.dp),
+                    elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 8.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("Actualización disponible", color = Color(0xFFEEF1F5), fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
                         Text("Versión X.${result.remoteVersion.versionCode} disponible", color = Color(0xFFE2B94E), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         Text(result.releaseNotes, color = Color(0xFF8B96A5), fontSize = 12.sp, maxLines = 4)
                         Text("Tus partidas, perfil y ajustes se conservan (mismo keystore)", color = Color(0xFF3DDC97), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            TextButton(
+                                onClick = { showUpdateDialog = false },
+                                modifier = Modifier.weight(1f),
+                                contentPadding = PaddingValues(vertical = 12.dp)
+                            ) { Text("Luego", color = Color(0xFF8B96A5), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                            Button(
+                                onClick = {
+                                    showUpdateDialog = false
+                                    updateScope.launch { updateManager.downloadAndInstall(result.apkUrl!!) { _ -> } }
+                                },
+                                modifier = Modifier.weight(1f),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3DDC97), contentColor = Color(0xFF0B0D10)),
+                                contentPadding = PaddingValues(vertical = 12.dp)
+                            ) { Text("Actualizar ahora", fontWeight = FontWeight.ExtraBold, fontSize = 13.sp) }
+                        }
                     }
-                },
-                confirmButton = {
-                    androidx.compose.material3.TextButton(
-                        onClick = {
-                            showUpdateDialog = false
-                            updateScope.launch { updateManager.downloadAndInstall(result.apkUrl!!) { _ -> } }
-                        },
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 10.dp)
-                    ) { Text("Actualizar ahora", color = Color(0xFF3DDC97), fontWeight = FontWeight.ExtraBold, fontSize = 13.sp) }
-                },
-                dismissButton = {
-                    androidx.compose.material3.TextButton(
-                        onClick = { showUpdateDialog = false },
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 10.dp)
-                    ) { Text("Luego", color = Color(0xFF8B96A5), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
-            )
+                }
+            }
         }
 
         Box(Modifier.weight(1f)) {
