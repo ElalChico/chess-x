@@ -39,11 +39,14 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.chessx.data.AppLanguage
 import com.chessx.data.AppPreferences
 import com.chessx.data.BtState
 import com.chessx.data.GameHistoryStore
 import com.chessx.data.GameRecord
+import com.chessx.data.UpdateManager
+import com.chessx.data.UpdateState
 import com.chessx.data.discoverableIntent
 import com.chessx.data.requiredPermissions
 import com.chessx.ui.GameViewModel
@@ -55,6 +58,10 @@ import com.chessx.ui.screens.ReplayScreen
 import com.chessx.ui.screens.RivalProfileDialog
 import com.chessx.ui.screens.RoomScreen
 import com.chessx.ui.screens.SettingsScreen
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 enum class Screen { HOME, CONNECT, PROFILE, GAME, SETTINGS, REPLAY, ROOM }
 
@@ -149,6 +156,7 @@ fun ChessApp(
     var history by remember { mutableStateOf(GameHistoryStore.load(activity)) }
     var replayRecord by remember { mutableStateOf<GameRecord?>(null) }
     var showRivalProfile by remember { mutableStateOf(false) }
+    val updateScope = remember { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
 
     LaunchedEffect(screen) { if (screen == Screen.PROFILE) history = GameHistoryStore.load(activity) }
 
@@ -215,7 +223,70 @@ fun ChessApp(
         if (ui.lobby.gameStarted && (screen == Screen.PROFILE || screen == Screen.ROOM)) screen = Screen.GAME
     }
 
+    // Auto-check updates on app start (silent, only shows dialog if update available)
+    val updateManager = remember { UpdateManager.getInstance(activity) }
+    val updateState by updateManager.updateState.collectAsStateWithLifecycle()
+    var autoUpdateChecked by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    var pendingUpdateResult by remember { mutableStateOf<com.chessx.data.UpdateCheckResult?>(null) }
+
+    LaunchedEffect(Unit) {
+        if (!autoUpdateChecked) {
+            autoUpdateChecked = true
+            updateManager.checkForUpdate()
+        }
+    }
+
+    LaunchedEffect(updateState) {
+        when (updateState) {
+            is UpdateState.UpdateAvailable -> {
+                val result = (updateState as UpdateState.UpdateAvailable).result
+                if (autoUpdateChecked && !showUpdateDialog) {
+                    pendingUpdateResult = result
+                    showUpdateDialog = true
+                }
+            }
+            is UpdateState.UpToDate, is UpdateState.Error -> {
+                // Silencioso: no mostrar nada al inicio, solo en Ajustes si se consulta manual
+            }
+            else -> { /* Checking, Downloading, Downloaded, Installing, Installed, Idle */ }
+        }
+    }
+
     Column(Modifier.fillMaxSize().background(Color(0xFF0B0D10))) {
+        // Diálogo de actualización automática al inicio
+        if (showUpdateDialog && pendingUpdateResult != null) {
+            val result = pendingUpdateResult!!
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showUpdateDialog = false },
+                title = { Text("Actualización disponible", color = Color(0xFFEEF1F5), fontWeight = FontWeight.ExtraBold, fontSize = 18.sp) },
+                text = {
+                    Column(Modifier.padding(top = 8.dp, bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("Versión X.${result.remoteVersion.versionCode} disponible", color = Color(0xFFE2B94E), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(result.releaseNotes, color = Color(0xFF8B96A5), fontSize = 12.sp, maxLines = 4)
+                        Text("Tus partidas, perfil y ajustes se conservan (mismo keystore)", color = Color(0xFF3DDC97), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                },
+                confirmButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            showUpdateDialog = false
+                            updateScope.launch { updateManager.downloadAndInstall(result.apkUrl!!) { _ -> } }
+                        },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                    ) { Text("Actualizar ahora", color = Color(0xFF3DDC97), fontWeight = FontWeight.ExtraBold, fontSize = 13.sp) }
+                },
+                dismissButton = {
+                    androidx.compose.material3.TextButton(
+                        onClick = { showUpdateDialog = false },
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                    ) { Text("Luego", color = Color(0xFF8B96A5), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            )
+        }
+
         Box(Modifier.weight(1f)) {
             when (screen) {
                 Screen.HOME -> HomeScreen(

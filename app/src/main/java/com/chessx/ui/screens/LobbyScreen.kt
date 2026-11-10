@@ -113,7 +113,7 @@ fun LobbyScreen(
     onPhotoCropped: (String) -> Unit = {},
     onBack: () -> Unit
 ) {
-    var nameText by remember(localName) { mutableStateOf(localName) }
+    var nameText by remember { mutableStateOf("") }
     var pendingCrop by remember { mutableStateOf<Bitmap?>(null) }
     var photoError by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
@@ -150,6 +150,15 @@ fun LobbyScreen(
             },
             onDismiss = { pendingCrop = null }
         )
+    }
+
+    // Inicializar nombre: vacío si primera vez, o nombre guardado para editar
+    LaunchedEffect(localName) {
+        if (localName.isNotBlank()) {
+            nameText = localName
+        } else {
+            nameText = ""
+        }
     }
 
     Column(
