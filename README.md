@@ -6,6 +6,8 @@ App de ajedrez para Android, simple y directa: conecta dos móviles por
 **Bluetooth (SPP)** y juega una partida entre amigos, **en local**, sin internet,
 sin cuentas y sin servidores.
 
+[![Descargar última versión](https://img.shields.io/github/v/release/ElalChico/chess-x?label=Descargar&color=0078D4&logo=github)](https://github.com/ElalChico/chess-x/releases/latest)
+
 ## Qué es
 
 CHESS-X es una app de ajedrez **solo Bluetooth**. Un móvil crea la partida
