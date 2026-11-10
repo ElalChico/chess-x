@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -88,17 +89,16 @@ fun PhotoCropDialog(
             val maxW = maxWidth
             val maxH = maxHeight
 
-            // Recuadro cuadrado SIEMPRE centrado, con margen respecto a la pantalla
+            // Recuadro CIRCULAR SIEMPRE centrado, con margen respecto a la pantalla
             val frameSide: Dp = (if (maxW < maxH) maxW else maxH) * 0.78f
             val frameSizePx = with(density) { frameSide.toPx() }
+            val halfFrame = frameSizePx / 2f
 
             // Zoom y desplazamiento de la foto (estado retenido)
             var scale by remember { mutableFloatStateOf(1f) }
             var offset by remember { mutableStateOf(Offset.Zero) }
 
-            // Límites de arrastre: la foto nunca se sale del recuadro.
-            // ContentScale.Fit dentro de un área de frameSizePx: calculamos el
-            // tamaño dibujado para permitir desplazar sólo el desbordamiento real.
+            // Límites de arrastre: la foto nunca se sale del recuadro circular.
             val srcW = bitmap.width.toFloat().coerceAtLeast(1f)
             val srcH = bitmap.height.toFloat().coerceAtLeast(1f)
             val fitScale = remember(frameSizePx, srcW, srcH) { max(frameSizePx / srcW, frameSizePx / srcH) }
@@ -121,12 +121,11 @@ fun PhotoCropDialog(
                     modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
                 )
 
-                // Zona interactiva: mide EXACTAMENTE igual que el recuadro de
-                // recorte, para que el recorte calculado sea exacto.
+                // Zona interactiva: mide EXACTAMENTE igual que el recuadro circular de recorte
                 Box(
                     modifier = Modifier
                         .size(frameSide)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(CircleShape)
                         .background(Color(0xFF0B0D10)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -137,6 +136,7 @@ fun PhotoCropDialog(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxSize()
+                            .clip(CircleShape)
                             .graphicsLayer {
                                 scaleX = scale
                                 scaleY = scale
@@ -169,30 +169,20 @@ fun PhotoCropDialog(
                         alpha = 1f
                     )
 
-                    // Máscara oscura alrededor del recuadro centrado
+                    // Borde VERDE del recuadro CIRCULAR (siempre centrado)
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        val cx = size.width / 2f
-                        val cy = size.height / 2f
-                        val half = frameSizePx / 2f
-                        // 4 rectángulos cubriendo todo menos el cuadrado central
-                        drawRect(color = Color(0x99000000), topLeft = Offset.Zero, size = Size(cx - half, size.height))
-                        drawRect(color = Color(0x99000000), topLeft = Offset(cx + half, 0f), size = Size(size.width - cx - half, size.height))
-                        drawRect(color = Color(0x99000000), topLeft = Offset(cx - half, 0f), size = Size(half * 2f, cy - half))
-                        drawRect(color = Color(0x99000000), topLeft = Offset(cx - half, cy + half), size = Size(half * 2f, size.height - cy - half))
-                        // Borde dorado del recuadro (siempre centrado)
-                        drawRect(
-                            color = Color(0xFFE2B94E),
-                            topLeft = Offset(cx - half, cy - half),
-                            size = Size(half * 2f, half * 2f),
-                            style = Stroke(width = 2.dp.toPx())
+                        drawCircle(
+                            color = Color(0xFF3DDC97), // Verde CHESS-X
+                            radius = halfFrame,
+                            style = Stroke(width = 3.dp.toPx())
                         )
                     }
 
-                    // Círculo guía central (la foto se recorta cuadrada; el avatar es redondo)
+                    // Círculo guía central sutil
                     Canvas(modifier = Modifier.size(frameSide)) {
                         drawCircle(
                             color = Color(0x33FFFFFF),
-                            radius = size.minDimension / 2f - 1.dp.toPx(),
+                            radius = halfFrame - 1.dp.toPx(),
                             style = Stroke(width = 1.dp.toPx())
                         )
                     }
@@ -222,11 +212,11 @@ fun PhotoCropDialog(
                             onConfirm(cropped)
                         },
                         modifier = Modifier.weight(1f),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFE2B94E), contentColor = Color(0xFF0B0D10))
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3DDC97), contentColor = Color(0xFF0B0D10))
                     ) { Text("Guardar", fontWeight = FontWeight.ExtraBold) }
                 }
                 Text(
-                    "El recuadro se mantiene centrado",
+                    "El recuadro circular se mantiene centrado",
                     color = Color(0xFF6B6244),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.SemiBold,

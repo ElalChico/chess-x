@@ -413,12 +413,7 @@ fun ChessApp(
                     }
                     Screen.GAME -> {
                         fullscreen = false
-                        screen = when {
-                            ui.lobby.gameStarted -> Screen.GAME
-                            btState == BtState.CONNECTED -> Screen.ROOM
-                            isHostMode -> Screen.ROOM
-                            else -> Screen.CONNECT
-                        }
+                        screen = Screen.GAME
                     }
                     Screen.SETTINGS -> {
                         fullscreen = false
