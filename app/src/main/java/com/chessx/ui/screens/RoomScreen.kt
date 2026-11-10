@@ -41,9 +41,7 @@ private val Green = Color(0xFF3DDC97)
 private val Red = Color(0xFFFF6B6B)
 
 /**
- * Sala previa al juego: se llega aquí al vincularse.
- * Muestra a ambos jugadores, configura reloj y color (anfitrión)
- * y el botón «Comenzar partida» SOLO lo pulsa el anfitrión.
+ * Sala de partida: permite configurar reloj y color, conectar al rival e iniciar.
  */
 @Composable
 fun RoomScreen(
@@ -56,23 +54,30 @@ fun RoomScreen(
     onTimePick: (Long, Long) -> Unit,
     onColorPick: (ChessColor) -> Unit,
     onRandomColor: () -> Unit,
+    onConnect: () -> Unit,
     onStartGame: () -> Unit,
     onStartTournament: (Int) -> Unit = {},
     onBack: () -> Unit
 ) {
     val isHost = lobby.isHost
-    val rivalOk = remoteName.isNotBlank()
+    val rivalOk = remoteName.isNotBlank() && lobby.connected
     val clockLabel = if (lobby.timeMs == 0L) "Sin límite" else "${lobby.timeMs / 60000} + ${lobby.incrementMs / 1000}"
     val colorLabel = if (lobby.colorRandom) "Aleatorio" else if (lobby.localColor == ChessColor.WHITE) "Blancas" else "Negras"
+    var tournamentMode by remember { mutableStateOf(false) }
+    var tournamentGames by remember { mutableIntStateOf(4) }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(Bg)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = onBack, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
                 Text("← Volver al inicio", color = Muted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -96,8 +101,8 @@ fun RoomScreen(
             fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, color = Text1
         )
         Text(
-            if (isHost) "Eres el anfitrión · configura la partida y pulsa «Comenzar»."
-            else "Eres el invitado · el anfitrión configura y pulsa «Comenzar».",
+            if (isHost) "Configura el reloj y el color antes de conectar al rival."
+            else "Eres el invitado · espera a que el anfitrión inicie la partida.",
             color = Muted, fontSize = 12.sp, lineHeight = 17.sp
         )
 
@@ -113,7 +118,7 @@ fun RoomScreen(
         )
         RoomPlayerCard(
             name = remoteProfile?.name?.ifBlank { remoteName.ifBlank { "Rival" } } ?: remoteName.ifBlank { "Rival" },
-            role = "RIVAL",
+            role = if (isHost) "INVITADO" else "ANFITRIÓN",
             color = lobby.remoteColor,
             photoBase64 = remoteProfile?.photoBase64,
             accent = Color(0xFF5B9DF9),
@@ -186,7 +191,6 @@ fun RoomScreen(
 
         // ===== Torneo (solo anfitrión): N partidas seguidas, colores alternos =====
         if (isHost) {
-            var games by remember { mutableIntStateOf(4) }
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -201,10 +205,10 @@ fun RoomScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Stepper("Partidas", games, 2, 6, Modifier.weight(1f)) { games = it }
+                    Stepper("Partidas", tournamentGames, 2, 6, Modifier.weight(1f)) { tournamentGames = it }
                     Column(Modifier.weight(2f)) {
                         Text(
-                            "$games partidas seguidas",
+                            "$tournamentGames partidas seguidas",
                             fontSize = 13.sp,
                             fontWeight = FontWeight.ExtraBold,
                             color = Text1
@@ -220,9 +224,9 @@ fun RoomScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp)
-                        .background(if (rivalOk) Color(0xFF0F0F0F) else Color(0xFF111111), RoundedCornerShape(14.dp))
-                        .border(1.2.dp, if (rivalOk) Gold else Color(0xFF232323), RoundedCornerShape(14.dp))
-                        .clickable(enabled = rivalOk) { onStartTournament(games) }
+                        .background(if (tournamentMode) Color(0xFF1A1A14) else Color(0xFF111111), RoundedCornerShape(14.dp))
+                        .border(1.2.dp, if (tournamentMode) Gold else Color(0xFF232323), RoundedCornerShape(14.dp))
+                        .clickable { tournamentMode = !tournamentMode }
                         .padding(horizontal = 16.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
@@ -234,19 +238,19 @@ fun RoomScreen(
                                 .border(1.dp, if (rivalOk) Color(0xFF3A3524) else Color(0xFF26261F), RoundedCornerShape(11.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("T", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = if (rivalOk) Gold else Color(0xFF6B6244))
+                            Text("T", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = if (tournamentMode) Gold else Color(0xFF6B6244))
                         }
                         Column {
                             Text(
-                                "Crear torneo",
+                                if (tournamentMode) "Torneo seleccionado" else "Seleccionar torneo",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.ExtraBold,
-                                color = if (rivalOk) Gold else Muted
+                                color = if (tournamentMode) Gold else Text1
                             )
                             Text(
-                                if (rivalOk) "Primera partida con cuenta 3-2-1" else "Esperando al rival…",
+                                "Iniciará $tournamentGames partidas con colores alternos",
                                 fontSize = 10.sp,
-                                color = if (rivalOk) Color(0xFFA8975E) else Color(0xFF555A66),
+                                color = Color(0xFFA8975E),
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -255,52 +259,58 @@ fun RoomScreen(
             }
         }
 
-        // ===== Comenzar — SOLO anfitrión =====
+        }
+
         if (isHost) {
-            val canStart = rivalOk
-            Box(
+            val actionLabel = when {
+                !lobby.connected -> "Conectar rival"
+                tournamentMode -> "Iniciar torneo"
+                else -> "Iniciar partida"
+            }
+            val actionDetail = when {
+                !lobby.connected -> "Primero configura el reloj y luego conecta al rival"
+                !rivalOk -> "Bluetooth conectado · sincronizando perfil del rival"
+                else -> "Ambos móviles comenzarán con una cuenta regresiva"
+            }
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(88.dp)
-                    .background(
-                        if (canStart) Brush.horizontalGradient(listOf(Color(0xFF1A1A14), Color(0xFF0F0F0F)))
-                        else Brush.horizontalGradient(listOf(Color(0xFF141414), Color(0xFF111111))),
-                        RoundedCornerShape(20.dp)
-                    )
-                    .border(2.dp, if (canStart) Gold else Color(0xFF2A2A2A), RoundedCornerShape(20.dp))
-                    .clickable(enabled = canStart) { if (canStart) onStartGame() }
-                    .padding(horizontal = 20.dp),
-                contentAlignment = Alignment.CenterStart
+                    .background(Bg)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Box(
-                        Modifier
-                            .size(48.dp)
-                            .background(Color(0xFF1A1A14), RoundedCornerShape(14.dp))
-                            .border(1.5.dp, if (canStart) Color(0xFF3A3524) else Color(0xFF26261F), RoundedCornerShape(14.dp)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (canStart) {
-                            Text("▶", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
+                Button(
+                    onClick = {
+                        if (lobby.connected) {
+                            if (tournamentMode) onStartTournament(tournamentGames) else onStartGame()
                         } else {
-                            CircularProgressIndicator(color = Gold, modifier = Modifier.size(20.dp), strokeWidth = 3.dp)
+                            onConnect()
                         }
-                    }
-                    Column {
-                        Text(
-                            if (canStart) "Comenzar partida" else "Esperando al rival…",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = if (canStart) Gold else Muted
-                        )
-                        Text(
-                            if (canStart) "Cuenta regresiva 3-2-1 sincronizada en ambos móviles" else "Pulsa cuando el rival se conecte",
-                            fontSize = 12.sp,
-                            color = if (canStart) Color(0xFFA8975E) else Color(0xFF555A66),
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1
-                        )
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(62.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A14), contentColor = Gold),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Gold)
+                ) {
+                    Text(
+                        "$actionLabel  →",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+                Text(
+                    actionDetail,
+                    modifier = Modifier.fillMaxWidth(),
+                    color = Muted,
+                    fontSize = 10.sp,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+                TextButton(
+                    onClick = onBack,
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                ) {
+                    Text("Salir de la sala", color = Red, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         } else {
@@ -308,24 +318,18 @@ fun RoomScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(Card, RoundedCornerShape(16.dp))
-                    .border(1.dp, Line, RoundedCornerShape(16.dp))
-                    .padding(20.dp),
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                CircularProgressIndicator(color = Gold, modifier = Modifier.size(22.dp), strokeWidth = 3.dp)
+                CircularProgressIndicator(color = Gold, modifier = Modifier.size(20.dp), strokeWidth = 3.dp)
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text("Tú eres el invitado", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("El anfitrión pulsa «Comenzar» cuando él quiera", color = Muted, fontSize = 11.sp)
+                    Text("El anfitrión iniciará la partida", color = Muted, fontSize = 11.sp)
                 }
             }
         }
-
-        TextButton(onClick = onBack, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
-            Text("Salir de la sala", color = Red, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-        }
-        Spacer(Modifier.height(8.dp))
     }
 }
 

@@ -17,9 +17,10 @@ enum class SoundType {
  * "sfx" — sin sonidos de naturaleza ni de animales.
  * Cargados en un SoundPool: latencia baja, seguro en cualquier API 26+.
  */
-class SoundManager(private val context: Context) {
+class SoundManager(private val context: Context, pack: SoundPack = SoundPack.DEFAULT) {
     private var enabled: Boolean = true
     private var volumePercent: Int = 80
+    private var soundPack: SoundPack = pack
 
     private val pool: SoundPool? = try {
         val attrs = AudioAttributes.Builder()
@@ -70,8 +71,14 @@ class SoundManager(private val context: Context) {
     fun isEnabled(): Boolean = enabled
     fun setVolume(percent: Int) { volumePercent = percent.coerceIn(0, 100) }
     fun getVolume(): Int = volumePercent
+    fun setPack(pack: SoundPack) { soundPack = pack }
 
     private fun vol(): Float = (volumePercent / 100f).coerceIn(0f, 1f)
+    private fun pitch(): Float = when (soundPack) {
+        SoundPack.LICHESS -> 1f
+        SoundPack.FREE -> 1.08f
+        SoundPack.CLASSIC -> 0.94f
+    }
 
     fun play(type: SoundType) {
         if (!enabled) return
@@ -93,7 +100,7 @@ class SoundManager(private val context: Context) {
         }
         if (id <= 0) return
         try {
-            pool?.play(id, vol(), vol(), 1, 0, 1f)
+            pool?.play(id, vol(), vol(), 1, 0, pitch())
         } catch (e: Exception) {
             Log.w("Sound", "play failed", e)
         }
@@ -102,7 +109,7 @@ class SoundManager(private val context: Context) {
     /** Sonido de confirmación (aceptar conexiones / iniciar partida). */
     fun playConfirmation() {
         if (!enabled) return
-        if (confirmId > 0) try { pool?.play(confirmId, vol(), vol(), 1, 0, 1f) } catch (_: Exception) {}
+        if (confirmId > 0) try { pool?.play(confirmId, vol(), vol(), 1, 0, pitch()) } catch (_: Exception) {}
     }
 
     fun release() {

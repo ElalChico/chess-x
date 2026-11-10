@@ -51,8 +51,10 @@ private val Red = Color(0xFFFF6B6B)
 fun GameScreen(
     ui: UiGameState,
     isFullscreen: Boolean,
-    boardTheme: com.chessx.data.BoardTheme = com.chessx.data.BoardTheme.CLASSIC,
+    boardTheme: com.chessx.data.BoardTheme = com.chessx.data.BoardTheme.LICHESS,
+    pieceSet: com.chessx.data.PieceSet = com.chessx.data.PieceSet.DEFAULT,
     moveIndicators: Boolean = true,
+    showCoordinates: Boolean = true,
     localPhotoBase64: String = "",
     remoteProfile: com.chessx.data.RemoteProfile? = null,
     onViewRivalProfile: () -> Unit = {},
@@ -72,7 +74,9 @@ fun GameScreen(
     onTournamentNext: () -> Unit = {},
     onBackToRoom: () -> Unit = {},
     onGameEndDismiss: () -> Unit = {},
-    onNewTournament: () -> Unit = {}
+    onNewTournament: () -> Unit = {},
+    onReplayPgn: () -> Unit = {},
+    onNewGameCustomTime: (Long, Long) -> Unit = { _, _ -> }
 ) {
     Column(
         modifier = Modifier
@@ -144,9 +148,11 @@ fun GameScreen(
                     errorSquare = ui.selection.errorSquare
                 ),
                 onSquareTap = onSquareTap,
-                modifier = Modifier.size(boardSize),
+                modifier = Modifier.size(boardSize).aspectRatio(1f),
                 theme = boardTheme,
-                showMoveIndicators = moveIndicators
+                pieceSet = pieceSet,
+                showMoveIndicators = moveIndicators,
+                showCoordinates = showCoordinates
             )
         }
 
@@ -227,6 +233,7 @@ fun GameScreen(
         ui.promotionPending?.let {
             PromotionPieceDialog(
                 localColor = ui.localColor,
+                pieceSet = pieceSet,
                 onPromote = onPromotion,
                 onCancel = onCancelPromotion
             )
@@ -253,15 +260,36 @@ fun GameScreen(
         }
 
         ui.gameEnd?.let { end ->
+            // Determine winner name and photo
+            val resultColorStr = if (end.winner == null) "draw" else
+                (if (end.winner == ChessColor.WHITE) "white" else "black")
+            val winnerName = when (resultColorStr) {
+                "white" -> ui.localName
+                "black" -> ui.remoteName
+                else -> null
+            }
+            val winnerPhoto = when (resultColorStr) {
+                "white" -> localPhotoBase64
+                "black" -> remoteProfile?.photoBase64
+                else -> null
+            }
+            
             GameEndDialog(
                 end = end,
                 isHost = ui.lobby.isHost,
                 tournamentActive = ui.tournament.active && !ui.tournament.finished,
                 tournamentFinished = ui.tournament.finished,
+                localName = ui.localName,
+                remoteName = ui.remoteName,
+                localPhotoBase64 = localPhotoBase64,
+                remotePhotoBase64 = remoteProfile?.photoBase64,
+                winnerName = winnerName,
                 onNewGameSame = onNewGameSame,
                 onNewGameRandom = onNewGameRandom,
                 onTournamentNext = onTournamentNext,
                 onBackToRoom = onBackToRoom,
+                onReplayPgn = { /* handled in MainActivity */ },
+                onNewGameCustomTime = { timeMs, incMs -> /* handled in MainActivity */ },
                 onDismiss = onGameEndDismiss
             )
         }

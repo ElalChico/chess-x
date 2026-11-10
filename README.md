@@ -38,11 +38,13 @@ se pone rojo en jaque, y hay pausa, tablas y abandono.
 - Perfil con foto (recorte con zoom), nombre e historial de partidas.
 - Modo torneo: varias partidas seguidas con colores alternos.
 - Sin GPS y sin permisos raros: solo Bluetooth.
+- Conjuntos de piezas vectoriales Lichess y diseños originales modernos.
+- Coordenadas del tablero configurables desde Ajustes.
 
 ## Instalar
 
 Descarga el APK de la última versión desde la sección **Releases** de este
-repositorio (por ejemplo `chess-x-X.46.apk`) e instálalo en tu móvil Android
+repositorio (por ejemplo `chess-x-X.51.apk`) e instálalo en tu móvil Android
 (Android 8 o superior). Solo necesitas activar el Bluetooth.
 
 ## Compilar tú mismo

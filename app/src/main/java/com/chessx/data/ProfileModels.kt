@@ -18,7 +18,8 @@ data class GameRecord(
     val finalFen: String,
     val playerName: String = "Jugador",
     val uciMoves: List<String> = emptyList(),
-    val moveClocks: List<Long> = emptyList() // remaining ms of the mover after each move
+    val moveClocks: List<Long> = emptyList(), // remaining ms of the mover after each move
+    val opponentPhotoBase64: String? = null // foto del rival para historial/replay
 ) {
     fun dateLabel(): String = SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date(dateMs))
 }
@@ -31,7 +32,11 @@ data class RemoteGame(
     val moves: Int = 0,
     val timeLabel: String = "",
     val opponent: String = "",
-    val playerName: String = ""
+    val playerName: String = "",
+    val localColorWhite: Boolean = true,
+    val movesSan: List<String> = emptyList(),
+    val uciMoves: List<String> = emptyList(),
+    val pgn: String = ""
 ) {
     fun dateLabel(): String = SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date(dateMs))
 }

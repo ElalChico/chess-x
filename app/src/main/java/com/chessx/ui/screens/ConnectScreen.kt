@@ -22,7 +22,10 @@ import com.chessx.core.Color as ChessColor
 import com.chessx.core.Piece
 import com.chessx.core.PieceType
 import com.chessx.data.BtState
+import com.chessx.data.BoardTheme
+import com.chessx.data.DeviceRole
 import com.chessx.data.DiscoveredDevice
+import com.chessx.data.PieceSet
 import com.chessx.data.RemoteProfile
 import com.chessx.ui.components.ChessBoard
 import com.chessx.ui.components.BoardSelection
@@ -52,7 +55,10 @@ fun ConnectScreen(
     myName: String = "Jugador",
     remoteName: String = "",
     remoteProfile: RemoteProfile? = null,
-    onViewRivalProfile: () -> Unit = {}
+    onViewRivalProfile: () -> Unit = {},
+    boardTheme: BoardTheme = BoardTheme.LICHESS,
+    pieceSet: PieceSet = PieceSet.DEFAULT,
+    showCoordinates: Boolean = true
 ) {
     Column(Modifier.fillMaxSize().background(Bg).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -90,37 +96,40 @@ fun ConnectScreen(
         val previewEngine = remember { ChessEngine() }
         val previewSnapshot = previewEngine.snapshot
         val previewSelection = BoardSelection(null)
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.6f) // Peso para que ocupe espacio proporcional
-                .aspectRatio(1f)
-                .background(Color(0xFF0E1318), RoundedCornerShape(16.dp))
-                .border(1.dp, Line, RoundedCornerShape(16.dp))
+                .weight(0.6f),
+            contentAlignment = Alignment.Center
         ) {
-            ChessBoard(
-                snapshot = previewSnapshot,
-                perspective = ChessColor.WHITE,
-                selection = previewSelection,
-                onSquareTap = { },
-                theme = com.chessx.data.BoardTheme.CLASSIC,
-                showMoveIndicators = false,
+            val boardSize = minOf(maxWidth, maxHeight)
+            Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(4.dp)
-            )
-            // Overlay de estado de conexión
-            if (btState != BtState.CONNECTED) {
-                Box(
+                    .size(boardSize)
+                    .background(Color(0xFF0E1318), RoundedCornerShape(16.dp))
+                    .border(1.dp, Line, RoundedCornerShape(16.dp))
+            ) {
+                ChessBoard(
+                    snapshot = previewSnapshot,
+                    perspective = ChessColor.WHITE,
+                    selection = previewSelection,
+                    onSquareTap = { },
+                    theme = boardTheme,
+                    pieceSet = pieceSet,
+                    showMoveIndicators = false,
+                    showCoordinates = showCoordinates,
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(Color(0xAA0B0D10), RoundedCornerShape(16.dp))
-                        .clickable { },
-                    contentAlignment = Alignment.Center
-                ) {
+                        .padding(4.dp)
+                )
+                if (btState != BtState.CONNECTED) {
                     Column(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color(0xAA0B0D10), RoundedCornerShape(16.dp))
+                            .clickable { },
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.Center
                     ) {
                         when (btState) {
                             BtState.WAITING_HOST -> {
@@ -236,58 +245,229 @@ fun ConnectScreen(
         }
 
         Spacer(Modifier.height(12.dp))
+
+        // Group devices: CHESS-X first, then others
+        val chessXDevices = devices.filter { it.isChessX }
+        val otherDevices = devices.filter { !it.isChessX }
+        val totalDevices = devices.size
+
         Text(
-            if (isHostMode) "DISPOSITIVOS QUE TE BUSCAN (${devices.size})" else "DISPOSITIVOS (${devices.size})",
+            if (isHostMode) "DISPOSITIVOS QUE TE BUSCAN ($totalDevices)" else "DISPOSITIVOS ENCONTRADOS ($totalDevices)",
             color = Muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp
         )
 
-        LazyColumn(modifier = Modifier.fillMaxWidth().weight(0.4f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(0.55f)
+                .padding(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(vertical = 4.dp)
+        ) {
+            // Empty state
             if (devices.isEmpty()) {
                 item {
-                    Text(
-                        if (isHostMode)
-                            "Cuando el otro móvil esté en «Unirse a partida» y toque este dispositivo, aparecerá aquí."
-                        else
-                            "Pulsa «Buscar rivales»; los móviles con CHESS-X escuchando aparecerán aquí.",
-                        color = Muted, fontSize = 12.sp, modifier = Modifier.padding(vertical = 14.dp)
-                    )
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp, horizontal = 16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text("📡", fontSize = 32.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            if (isHostMode)
+                                "El invitado debe abrir CHESS-X, pulsar «Unirse a partida» y tocar este dispositivo."
+                            else
+                                "Pulsa «Buscar rivales».\nLos móviles con CHESS-X aparecerán destacados en dorado.",
+                            color = Muted, fontSize = 13.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+                }
+            } else {
+                // Section: CHESS-X Devices
+                if (chessXDevices.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("🟡 DISPOSITIVOS CHESS-X", color = Gold, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.5.sp)
+                            Text("${chessXDevices.size}", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    items(chessXDevices) { d ->
+                        ChessXDeviceCard(d, isHostMode, onConnect)
+                    }
+                }
+
+                // Section: Other Devices
+                if (otherDevices.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text("OTROS DISPOSITIVOS", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                            Text("${otherDevices.size}", color = Muted, fontSize = 10.sp)
+                        }
+                    }
+                    items(otherDevices) { d ->
+                        OtherDeviceCard(d, isHostMode, onConnect)
+                    }
                 }
             }
-            items(devices) { d ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(Card, RoundedCornerShape(14.dp))
-                        .border(1.dp, Line, RoundedCornerShape(14.dp))
-                        .padding(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+        }
+    }
+}
+
+// ---- Device Cards ----
+
+@Composable
+private fun ChessXDeviceCard(
+    d: DiscoveredDevice,
+    isHostMode: Boolean,
+    onConnect: (String) -> Unit
+) {
+    val roleText = when (d.role) {
+        DeviceRole.HOST -> "Anfitrión"
+        DeviceRole.GUEST -> "Invitado"
+        else -> "Desconocido"
+    }
+    val displayName = d.username?.ifBlank { roleText } ?: roleText
+    val subtitle = "CHESS-X · $displayName"
+    
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Card, RoundedCornerShape(16.dp))
+            .border(2.dp, Gold.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
+            .padding(12.dp)
+            .then(if (!isHostMode) Modifier.clickable { onConnect(d.address) } else Modifier),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // ChessX Badge
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .background(Color(0xFF1A1A14), RoundedCornerShape(12.dp))
+                .border(1.5.dp, Gold, RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("♟", fontSize = 20.sp)
+        }
+        Spacer(Modifier.width(12.dp))
+        
+        Column(Modifier.weight(1f)) {
+            Text(d.name, color = Text1, fontWeight = FontWeight.ExtraBold, fontSize = 14.sp, maxLines = 1)
+            Text(subtitle, color = Gold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(d.address, color = Muted, fontSize = 9.sp)
+                if (d.bonded) {
                     Box(
                         modifier = Modifier
-                            .size(42.dp)
-                            .background(Color(0xFF1A2433), RoundedCornerShape(11.dp))
-                            .border(1.dp, Color(0xFF24324A), RoundedCornerShape(11.dp)),
-                        contentAlignment = Alignment.Center
-                    ) { Text(d.name.firstOrNull()?.uppercaseChar()?.toString() ?: "D", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5B9DF9)) }
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text(d.name, color = Text1, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
-                        Text(d.address, color = Muted, fontSize = 9.sp)
-                        if (d.bonded) Text("VINCULADO", color = Color(0xFF8FD3FF), fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
-                    }
-                    if (!isHostMode) {
-                        Button(
-                            onClick = { onConnect(d.address) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F0F0F), contentColor = Gold),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3A3524)),
-                            shape = RoundedCornerShape(11.dp),
-                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
-                        ) { Text("Conectar", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
-                    } else {
-                        Text("Esperando…", fontSize = 10.sp, color = Muted, fontWeight = FontWeight.SemiBold)
-                    }
+                            .padding(top = 1.dp)
+                            .background(Color(0xFF1E3A2A), RoundedCornerShape(4.dp))
+                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                    ) { Text("VINCULADO", color = Green, fontSize = 7.5.sp, fontWeight = FontWeight.ExtraBold) }
+                }
+                // RSSI indicator
+                RssiIndicator(d.rssi)
+            }
+        }
+        
+        if (!isHostMode) {
+            Button(
+                onClick = { onConnect(d.address) },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A14), contentColor = Gold),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, Gold),
+                shape = RoundedCornerShape(12.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Conectar", fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                    Text("→", fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
                 }
             }
+        } else {
+            Box(
+                modifier = Modifier
+                    .width(60.dp)
+                    .background(Color(0xFF1A1A14), RoundedCornerShape(12.dp))
+                    .border(1.dp, Color(0xFF3A3524), RoundedCornerShape(12.dp))
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Espera", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun OtherDeviceCard(
+    d: DiscoveredDevice,
+    isHostMode: Boolean,
+    onConnect: (String) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Card, RoundedCornerShape(14.dp))
+            .border(1.dp, Line, RoundedCornerShape(14.dp))
+            .padding(10.dp)
+            .then(if (!isHostMode) Modifier.clickable { onConnect(d.address) } else Modifier),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .background(Color(0xFF1A2433), RoundedCornerShape(11.dp))
+                .border(1.dp, Color(0xFF24324A), RoundedCornerShape(11.dp)),
+            contentAlignment = Alignment.Center
+        ) { Text(d.name.firstOrNull()?.uppercaseChar()?.toString() ?: "D", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = Color(0xFF5B9DF9)) }
+        Spacer(Modifier.width(10.dp))
+        Column(Modifier.weight(1f)) {
+            Text(d.name, color = Text1, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
+            Text("Dispositivo Bluetooth genérico", color = Muted, fontSize = 10.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(d.address, color = Muted, fontSize = 9.sp)
+                if (d.bonded) Text("VINCULADO", color = Color(0xFF8FD3FF), fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
+                RssiIndicator(d.rssi)
+            }
+        }
+        if (!isHostMode) {
+            Button(
+                onClick = { onConnect(d.address) },
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0F0F0F), contentColor = Gold),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF3A3524)),
+                shape = RoundedCornerShape(11.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
+            ) { Text("Conectar", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+        } else {
+            Text("Esperando…", fontSize = 10.sp, color = Muted, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun RssiIndicator(rssi: Int) {
+    val (bars, color) = when {
+        rssi >= -50 -> 4 to Green
+        rssi >= -70 -> 3 to Color(0xFFB8D94E)
+        rssi >= -85 -> 2 to Color(0xFFE2B94E)
+        else -> 1 to Red
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) {
+        repeat(4) { i ->
+            val barHeight = (i + 1) * 3
+            Box(
+                modifier = Modifier
+                    .width(3.dp)
+                    .height(barHeight.dp)
+                    .background(if (i < bars) color else color.copy(alpha = 0.2f), RoundedCornerShape(1.dp))
+            )
         }
     }
 }

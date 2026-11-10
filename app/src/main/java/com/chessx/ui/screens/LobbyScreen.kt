@@ -1,7 +1,11 @@
 package com.chessx.ui.screens
 
+import android.content.ContentResolver
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
+import android.net.Uri
 import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,6 +46,54 @@ private val Muted = Color(0xFF8B96A5)
 private val Gold = Color(0xFFE2B94E)
 private val Green = Color(0xFF3DDC97)
 
+private fun decodeOrientedImage(resolver: ContentResolver, uri: Uri): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+    val maxDimension = maxOf(bounds.outWidth, bounds.outHeight)
+    var sampleSize = 1
+    while (maxDimension / sampleSize > 2048) sampleSize *= 2
+    val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+    val bitmap = resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) } ?: return null
+    val orientation = resolver.openInputStream(uri)?.use {
+        ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)
+    } ?: ExifInterface.ORIENTATION_NORMAL
+    val transform = Matrix().apply {
+        when (orientation) {
+            ExifInterface.ORIENTATION_ROTATE_90 -> setRotate(90f)
+            ExifInterface.ORIENTATION_ROTATE_180 -> setRotate(180f)
+            ExifInterface.ORIENTATION_ROTATE_270 -> setRotate(270f)
+            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> setScale(-1f, 1f)
+            ExifInterface.ORIENTATION_FLIP_VERTICAL -> setScale(1f, -1f)
+            ExifInterface.ORIENTATION_TRANSPOSE -> {
+                setRotate(90f)
+                postScale(-1f, 1f)
+            }
+            ExifInterface.ORIENTATION_TRANSVERSE -> {
+                setRotate(270f)
+                postScale(-1f, 1f)
+            }
+        }
+    }
+    if (orientation == ExifInterface.ORIENTATION_NORMAL || orientation == ExifInterface.ORIENTATION_UNDEFINED) return bitmap
+    return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, transform, true)
+}
+
+private fun encodeProfilePhoto(cropped: Bitmap): String {
+    val side = minOf(cropped.width, cropped.height)
+    var scaled = Bitmap.createScaledBitmap(cropped, minOf(side, 384), minOf(side, 384), true)
+    for (quality in listOf(82, 72, 62, 52)) {
+        val output = ByteArrayOutputStream()
+        if (!scaled.compress(Bitmap.CompressFormat.JPEG, quality, output)) continue
+        if (output.size() <= 42_000) return Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
+    }
+    scaled = Bitmap.createScaledBitmap(scaled, 256, 256, true)
+    val output = ByteArrayOutputStream()
+    if (!scaled.compress(Bitmap.CompressFormat.JPEG, 60, output) || output.size() > 42_000) return ""
+    return Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
+}
+
 @Composable
 fun LobbyScreen(
     lobby: LobbyState,
@@ -52,8 +104,8 @@ fun LobbyScreen(
     remoteProfile: com.chessx.data.RemoteProfile? = null,
     connected: Boolean = false,
     onViewRivalProfile: () -> Unit = {},
-    onConnect: () -> Unit = {},
-    onGoRoom: () -> Unit = {},
+    continueLabel: String = "Continuar",
+    onContinue: () -> Unit = {},
     onNameChange: (String) -> Unit,
     onReplay: (GameRecord) -> Unit = {},
     onDeleteGame: (GameRecord) -> Unit = {},
@@ -69,13 +121,8 @@ fun LobbyScreen(
         photoError = null
         if (uri != null) {
             try {
-                pendingCrop = context.contentResolver.openInputStream(uri)?.use { input ->
-                    val tmp = BitmapFactory.decodeStream(input)
-                    if (tmp == null) {
-                        photoError = "No se pudo abrir la imagen"
-                        null
-                    } else downscale(tmp, 2048)
-                }
+                pendingCrop = decodeOrientedImage(context.contentResolver, uri)
+                    ?.let { downscale(it, 2048) }
                 if (pendingCrop == null && photoError == null) photoError = "No se pudo abrir la imagen"
             } catch (e: Exception) {
                 pendingCrop = null
@@ -88,13 +135,18 @@ fun LobbyScreen(
         PhotoCropDialog(
             bitmap = bmp,
             onConfirm = { cropped ->
-                val b64 = runCatching {
-                    val bytes = ByteArrayOutputStream()
-                    cropped.compress(Bitmap.CompressFormat.JPEG, 85, bytes)
-                    Base64.encodeToString(bytes.toByteArray(), Base64.NO_WRAP)
-                }.getOrDefault("")
-                if (b64.isNotBlank()) onPhotoCropped(b64)
-                pendingCrop = null
+                try {
+                    val b64 = encodeProfilePhoto(cropped)
+                    if (b64.isBlank()) {
+                        photoError = "No se pudo preparar la foto. Prueba con otra imagen."
+                    } else {
+                        onPhotoCropped(b64)
+                        photoError = null
+                        pendingCrop = null
+                    }
+                } catch (e: Exception) {
+                    photoError = "No se pudo guardar la foto. Prueba con otra imagen."
+                }
             },
             onDismiss = { pendingCrop = null }
         )
@@ -108,6 +160,9 @@ fun LobbyScreen(
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        photoError?.let {
+            Text(it, color = Color(0xFFFF6B6B), fontSize = 12.sp)
+        }
         TextButton(onClick = onBack, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 4.dp)) {
             Text("← Volver al inicio", color = Muted, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
@@ -203,47 +258,27 @@ fun LobbyScreen(
             Text("✓ Nombre guardado automáticamente", color = Green, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp, start = 4.dp))
         }
 
-        // Acceso a la sala (conectado) o puerta de emparejamiento
-        if (remoteName.isBlank()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF0F0F0F), RoundedCornerShape(16.dp))
-                    .border(1.5.dp, Color(0xFF3A3524), RoundedCornerShape(16.dp))
-                    .clickable { onConnect() }
-                    .padding(horizontal = 18.dp, vertical = 12.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Box(Modifier.size(38.dp).background(Color(0xFF1A1A14), RoundedCornerShape(11.dp)).border(1.dp, Color(0xFF3A3524), RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
-                        Text("BT", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
-                    }
-                    Column {
-                        Text("Conectar con el rival", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
-                        Text("Crea o abre la sala para emparejar dos móviles", fontSize = 10.sp, color = Color(0xFFA8975E))
-                    }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF0F0F0F), RoundedCornerShape(16.dp))
+                .border(1.5.dp, Color(0xFF3A3524), RoundedCornerShape(16.dp))
+                .clickable { onContinue() }
+                .padding(horizontal = 18.dp, vertical = 12.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Box(
+                    Modifier.size(38.dp)
+                        .background(Color(0xFF1A1A14), RoundedCornerShape(11.dp))
+                        .border(1.dp, Color(0xFF3A3524), RoundedCornerShape(11.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("→", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
                 }
-            }
-        } else {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF0F0F0F), RoundedCornerShape(16.dp))
-                    .border(1.5.dp, Color(0xFF3A3524), RoundedCornerShape(16.dp))
-                    .clickable { onGoRoom() }
-                    .padding(horizontal = 18.dp, vertical = 12.dp)
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Box(Modifier.size(38.dp).background(Color(0xFF1A1A14), RoundedCornerShape(11.dp)).border(1.dp, Color(0xFF3A3524), RoundedCornerShape(11.dp)), contentAlignment = Alignment.Center) {
-                        Text("VS", fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
-                    }
-                    Column {
-                        Text("Ir a la sala", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
-                        Text("Configurar la partida y comenzar · $remoteName", fontSize = 10.sp, color = Color(0xFFA8975E), maxLines = 1)
-                    }
+                Column {
+                    Text(continueLabel, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
+                    Text("Tu nombre y foto se comparten según tus ajustes", fontSize = 10.sp, color = Color(0xFFA8975E))
                 }
-            }
-            TextButton(onClick = onBack, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 2.dp)) {
-                Text("Salir de la sala", color = Color(0xFFFF9B9B), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -294,6 +329,13 @@ private fun SectionLabel(text: String) {
 
 @Composable
 private fun HistoryItem(rec: GameRecord, onReplay: () -> Unit, onDelete: () -> Unit) {
+    // Determine white and black player names based on who played white
+    val (whiteName, blackName) = if (rec.localColorWhite) {
+        rec.playerName to rec.opponent
+    } else {
+        rec.opponent to rec.playerName
+    }
+    
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -304,7 +346,7 @@ private fun HistoryItem(rec: GameRecord, onReplay: () -> Unit, onDelete: () -> U
     ) {
         Column(Modifier.weight(1f)) {
             Text(
-                "${rec.playerName} vs ${rec.opponent}",
+                "$whiteName ♔  vs  ♚ $blackName",
                 fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Text1, maxLines = 1
             )
             Text(

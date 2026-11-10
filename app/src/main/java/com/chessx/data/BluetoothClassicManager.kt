@@ -19,7 +19,9 @@ import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -33,7 +35,17 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 enum class BtState { IDLE, SCANNING, CONNECTING, WAITING_HOST, CONNECTED, DISCONNECTED, ERROR }
 
-data class DiscoveredDevice(val name: String, val address: String, val rssi: Int, val bonded: Boolean)
+enum class DeviceRole { UNKNOWN, HOST, GUEST }
+
+data class DiscoveredDevice(
+    val name: String,
+    val address: String,
+    val rssi: Int,
+    val bonded: Boolean,
+    val role: DeviceRole = DeviceRole.UNKNOWN,
+    val username: String? = null,
+    val isChessX: Boolean = false
+)
 
 class BluetoothClassicManager(
     private val context: Context,
@@ -56,13 +68,18 @@ class BluetoothClassicManager(
     private val _devices = MutableStateFlow<List<DiscoveredDevice>>(emptyList())
     val devices: StateFlow<List<DiscoveredDevice>> = _devices.asStateFlow()
 
-    private val _incoming = MutableStateFlow<BtMessage?>(null)
-    val incoming: StateFlow<BtMessage?> = _incoming.asStateFlow()
+    private val _incoming = MutableSharedFlow<BtMessage>(extraBufferCapacity = 64)
+    val incoming: SharedFlow<BtMessage> = _incoming
 
     private val _lastError = MutableStateFlow<String?>(null)
     val lastError: StateFlow<String?> = _lastError.asStateFlow()
 
+    /** Callback when a new connection is established. */
+    var onConnected: (() -> Unit)? = null
+
     @Volatile var isHost: Boolean = false
+        private set
+    @Volatile var hostName: String = "CHESS-X · Anfitrión"
         private set
 
     private var serverSocket: BluetoothServerSocket? = null
@@ -117,23 +134,87 @@ class BluetoothClassicManager(
             synchronized(seenAddresses) { seenAddresses.add(addr) }
             val name = try { device.name ?: device.alias ?: "Dispositivo" } catch (_: SecurityException) { "Sin permiso" }
             val bonded = try { device.bondState == BluetoothDevice.BOND_BONDED } catch (_: SecurityException) { false }
+            
+            // Detect if it's a CHESS-X device and extract role/username
+            val (isChessX, role, username) = parseChessXInfo(name)
+            
             scope.launch {
                 val current = _devices.value.toMutableList()
                 current.removeAll { it.address == addr }
-                current.add(DiscoveredDevice(name, addr, rssi, bonded))
-                _devices.value = current.sortedWith(compareByDescending<DiscoveredDevice> { it.bonded }.thenBy { it.name })
+                current.add(DiscoveredDevice(name, addr, rssi, bonded, role, username, isChessX))
+                _devices.value = current.sortedWith(
+                    compareByDescending<DiscoveredDevice> { it.isChessX }
+                        .thenByDescending { it.bonded }
+                        .thenBy { it.name }
+                )
             }
         } catch (e: Exception) { Log.w(TAG, "addDevice", e) }
+    }
+
+    private fun parseChessXInfo(name: String): Triple<Boolean, DeviceRole, String?> {
+        val lower = name.lowercase()
+        // Check if it's our app by service record name or naming convention
+        val isChessX = lower.contains("chess") || lower.contains("chx")
+        
+        var role = DeviceRole.UNKNOWN
+        var username: String? = null
+        
+        if (isChessX) {
+            // Try to parse format: "CHESS-X · Anfitrión" or "CHESS-X · Invitado" or "CHESS-X · Username"
+            if (lower.contains("anfitri")) role = DeviceRole.HOST
+            else if (lower.contains("invitad")) role = DeviceRole.GUEST
+            
+            // Extract username after "·"
+            val parts = name.split("·")
+            if (parts.size > 1) {
+                val candidate = parts.last().trim()
+                if (candidate.isNotBlank() && !candidate.equals("Anfitrión", true) && !candidate.equals("Invitado", true)) {
+                    username = candidate
+                }
+            }
+        }
+        
+        return Triple(isChessX, role, username)
     }
 
     fun isBluetoothOn(): Boolean = try { adapter()?.isEnabled == true } catch (_: SecurityException) { false }
     fun isAvailable(): Boolean = adapter() != null
 
+    fun setVisibleDeviceName(name: String): Boolean {
+        return try {
+            val bluetoothAdapter = bluetoothManager.adapter ?: run {
+                _lastError.value = "Bluetooth no disponible"
+                return false
+            }
+            bluetoothAdapter.name = name.trim().take(248)
+            true
+        } catch (e: SecurityException) {
+            _lastError.value = "Sin permiso para cambiar el nombre Bluetooth"
+            Log.e(TAG, "setVisibleDeviceName requires Bluetooth permission", e)
+            false
+        } catch (e: Exception) {
+            _lastError.value = "No se pudo actualizar el nombre Bluetooth"
+            Log.e(TAG, "setVisibleDeviceName failed", e)
+            false
+        }
+    }
+
+    fun updateHostName(username: String?) {
+        hostName = "CHESS-X · ${username?.ifBlank { "Anfitrión" } ?: "Anfitrión"}"
+        if (isHost && _state.value == BtState.WAITING_HOST) {
+            setVisibleDeviceName(hostName)
+        }
+    }
+
     fun bondedDevices(): List<DiscoveredDevice> {
         return try {
             val set = adapter()?.bondedDevices ?: emptySet()
             set.mapNotNull { d ->
-                try { DiscoveredDevice(d.name ?: "Dispositivo", d.address, -50, true) } catch (_: SecurityException) { null }
+                try {
+                    val name = d.name ?: "Dispositivo"
+                    val (isChessX, role, username) = parseChessXInfo(name)
+                    DiscoveredDevice(name, d.address, -50, true, role, username, isChessX)
+                } catch (_: SecurityException) { null }
             }
         } catch (_: SecurityException) { emptyList() }
     }
@@ -183,6 +264,8 @@ class BluetoothClassicManager(
         _state.value = BtState.WAITING_HOST
         stopDiscovery()
         acceptJob?.cancel()
+        // Set visible name with role
+        setVisibleDeviceName(hostName)
         acceptJob = scope.launch(Dispatchers.IO) {
             try {
                 closeSocketOnly()
@@ -249,6 +332,8 @@ class BluetoothClassicManager(
             val inputReader = BufferedReader(InputStreamReader(s.getInputStream(), Charsets.UTF_8))
             startReader(inputReader)
             startHeartbeat()
+            // Notify connection established
+            onConnected?.invoke()
         } catch (e: Exception) {
             Log.e(TAG, "onSocketConnected setup", e)
             handleDisconnect("Error al iniciar canal")
@@ -264,7 +349,9 @@ class BluetoothClassicManager(
                     if (line == null) break // EOF => peer closed
                     val msg = MessageParser.parse(line)
                     if (msg != null) {
-                        _incoming.value = msg
+                        if (!_incoming.tryEmit(msg)) {
+                            Log.e(TAG, "Incoming message buffer full; dropped ${msg.type}")
+                        }
                     } else if (line.isNotBlank()) {
                         Log.w(TAG, "Unknown line len=${line.length}")
                     }

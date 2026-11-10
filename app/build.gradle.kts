@@ -21,8 +21,8 @@ android {
         applicationId = "com.chessx"
         minSdk = 26
         targetSdk = 34
-        versionCode = 46
-        versionName = "X.46"
+        versionCode = 52
+        versionName = "X.52"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -85,6 +85,11 @@ dependencies {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+
+    // OkHttp for downloading APK from GitHub releases
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okio:okio:3.9.0")
 
     // Local unit tests for the chess rules engine
     testImplementation("junit:junit:4.13.2")

@@ -126,12 +126,49 @@ body{
 /* connect list */
 h2{font-size:21px;letter-spacing:-.3px;font-weight:800}
 .muted{color:var(--muted);font-size:12.5px;line-height:1.5}
-.device{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px}
-.device .av{width:46px;height:46px;border-radius:14px;background:linear-gradient(145deg,#223041,#151B24);border:1px solid var(--line2);display:flex;align-items:center;justify-content:center;font-size:21px;color:var(--blue)}
-.device b{font-size:14.5px}
-.device small{display:block;color:var(--muted);font-size:11px;margin-top:2px}
-.linkpill{font-size:10.5px;color:#8FD3FF;background:#122033;border:1px solid #1E3A54;border-radius:6px;padding:2px 7px;display:inline-block;margin-top:4px;font-weight:600}
-.btn-link{background:var(--gold);color:#141414;border:0;border-radius:12px;padding:10px 14px;font-weight:700;font-size:13px;cursor:pointer}
+
+/* Section headers */
+.dev-section{font-size:10px;font-weight:800;letter-spacing:.5px;color:var(--muted);margin:8px 0 4px;padding:0 4px}
+.dev-section.chessx{color:var(--gold)}
+
+/* ChessX Device Card - gold highlighted */
+.dev-cx{display:flex;align-items:center;gap:12px;background:var(--card);border:2px solid var(--gold);border-radius:16px;padding:12px;position:relative;box-shadow:0 0 0 1px #E2B94E33 inset}
+.dev-cx .av{width:48px;height:48px;flex:0 0 48px;border-radius:12px;background:#1A1A14;border:1.5px solid var(--gold);display:flex;align-items:center;justify-content:center;font-size:20px}
+.dev-cx .info{flex:1;min-width:0}
+.dev-cx .name{font-size:14px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dev-cx .subtitle{font-size:11px;font-weight:700;color:var(--gold);margin-top:2px}
+.dev-cx .meta{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:9px;color:var(--muted)}
+.dev-cx .meta .bonded{font-size:7.5px;font-weight:800;color:var(--green);background:#1E3A2A;border-radius:4px;padding:1px 6px}
+.dev-cx .btn-conn{flex:0 0 auto;background:#1A1A14;border:1.5px solid var(--gold);color:var(--gold);border-radius:12px;padding:10px 16px;font-weight:800;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;transition:.15s}
+.dev-cx .btn-conn:hover{background:var(--gold);color:#0F0F0F}
+.dev-cx .btn-wait{flex:0 0 auto;width:60px;background:#1A1A14;border:1px solid #3A3524;border-radius:12px;padding:10px;color:var(--muted);font-size:9px;font-weight:700;text-align:center}
+
+/* Other Device Card */
+.dev-other{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px}
+.dev-other .av{width:42px;height:42px;flex:0 0 42px;border-radius:11px;background:#1A2433;border:1px solid #24324A;color:#5B9DF9;font-size:15px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.dev-other .info{flex:1;min-width:0}
+.dev-other .name{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dev-other .subtitle{font-size:10px;color:var(--muted);margin-top:2px}
+.dev-other .meta{display:flex;align-items:center;gap:8px;margin-top:4px;font-size:9px;color:var(--muted)}
+.dev-other .meta .bonded{font-size:8.5px;font-weight:700;color:#8FD3FF}
+.dev-other .btn-conn{flex:0 0 auto;background:#0F0F0F;border:1px solid #3A3524;color:var(--gold);border-radius:11px;padding:9px 14px;font-weight:700;font-size:12px;cursor:pointer}
+.dev-other .btn-wait{flex:0 0 auto;color:var(--muted);font-size:10px;font-weight:700}
+
+/* RSSI Indicator - 4 bars */
+.rssi{display:flex;align-items:flex-end;gap:1px;height:12px}
+.rssi .bar{width:3px;border-radius:1px;background:var(--muted);opacity:.2}
+.rssi .bar.on{opacity:1}
+.rssi .bar.b1{height:3px}.rssi .bar.b2{height:6px}.rssi .bar.b3{height:9px}.rssi .bar.b4{height:12px}
+.rssi.good .bar.on{background:var(--green)}
+.rssi.fair .bar.on{background:#B8D94E}
+.rssi.weak .bar.on{background:var(--gold)}
+.rssi.poor .bar.on{background:var(--red)}
+
+/* Empty state */
+.dev-empty{display:flex;flex-direction:column;align-items:center;gap:8px;padding:24px 16px;color:var(--muted);text-align:center}
+.dev-empty .icon{font-size:32px}
+.dev-empty p{font-size:13px;line-height:1.5}
+
 .found{animation:pop .3s ease both}
 @keyframes pop{from{transform:translateY(8px);opacity:0}to{transform:none;opacity:1}}
 /* lobby */
@@ -207,8 +244,9 @@ h2{font-size:21px;letter-spacing:-.3px;font-weight:800}
 .timebar i{display:block;height:100%;background:linear-gradient(90deg,#3DDC97,#7AF0BC);border-radius:2px;transition:width .3s linear}
 .pcard.active .timebar i{background:linear-gradient(90deg,#3DDC97,#7AF0BC)}
 /* ===== board ===== */
-.board-stage{display:flex;align-items:center;justify-content:center;padding:4px;background:#1A1A1A;min-height:auto;width:100%}
+.board-stage{padding:4px;background:#1A1A1A}
 #s-game .board-frame{position:relative;width:100%;height:auto;background:#2D2D2D;border:2px solid #5D5D5D;border-radius:12px;padding:7px;box-shadow:0 20px 40px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.05), inset 0 -1px 0 rgba(0,0,0,0.2)}
+#s-game .board{width:100%;height:100%;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr)}
 .board-frame:before{content:"";position:absolute;inset:5px;border-radius:13px;border:1px solid #00000066;pointer-events:none;z-index:2}
 .board{width:100%;height:100%;display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);border-radius:9px;overflow:hidden;box-shadow:inset 0 0 0 1px #00000055}
 .sq{display:flex;align-items:center;justify-content:center;position:relative;cursor:pointer;user-select:none;line-height:1}
@@ -735,17 +773,95 @@ function startListen(){
   peerRole='host'; peerConnected=false; peerName='';
   stopHostHere();
   const box=document.getElementById('deviceBox');
-  box.innerHTML='<p class="muted" style="padding:14px;text-align:center"><span class="pulse" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--green);margin-right:8px"></span>Escuchando… abre el preview en OTRA pestaña, pulsa «Unirse a partida» y en «Buscar rivales», y pulsa «Conectar».<br><small style="color:var(--muted)">Dos pestañas = dos móviles reales hablando entre sí.</small></p>';
+  // Show demo with grouped devices (simulating what host would see - devices connecting TO them)
+  box.innerHTML = 
+    '<div class="dev-empty"><div class="icon">📡</div><p>Cuando el otro móvil esté en <b>Unirse a partida</b> y toque este dispositivo, aparecerá aquí.</p></div>';
   document.getElementById('listenBtn').style.display='flex';
   updateSessionUI();
   hostHereTimer=setInterval(()=>{ if(peerRole==='host'&&!peerConnected)peerSend({t:'HOST_HERE'}) },1500);
+  
+  // Demo: simulate guest devices appearing after 2s
+  setTimeout(() => {
+    if (peerRole === 'host' && !peerConnected) {
+      showDemoGuestDevices();
+    }
+  }, 2000);
 }
 function doScan(){
   peerRole='guest'; peerConnected=false; peerName='';
   stopHostHere();
   const box=document.getElementById('deviceBox');
-  box.innerHTML='<p class="muted" style="padding:14px;text-align:center"><span class="pulse" style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--gold);margin-right:8px"></span>Buscando anfitriones CHESS-X cercanos…<br><small style="color:var(--muted)">Abre otra pestaña en «Crear partida → Escuchar» y este móvil la encontrará.</small></p>';
+  box.innerHTML = 
+    '<div class="dev-empty"><div class="icon">📡</div><p>Pulsa <b>Buscar rivales</b>.<br>Los móviles con CHESS-X aparecerán destacados en dorado.</p></div>';
   peerSend({t:'SEEK'});
+  
+  // Demo: simulate host devices appearing after 2s
+  setTimeout(() => {
+    if (peerRole === 'guest' && !peerConnected) {
+      showDemoHostDevices();
+    }
+  }, 2000);
+}
+
+// Demo: simulate multiple guest devices connecting to host
+function showDemoGuestDevices() {
+  const box = $id('deviceBox');
+  if (!box || peerConnected) return;
+  
+  box.innerHTML = '';
+  
+  // CHESS-X devices section
+  const cxSection = document.createElement('div');
+  cxSection.className = 'dev-section chessx';
+  cxSection.textContent = '🟡 DISPOSITIVOS CHESS-X (2)';
+  box.appendChild(cxSection);
+  
+  // Guest 1 - ChessX device
+  renderChessXDevice(box, 'CHESS-X · Invitado', 'GUEST', 'Carlos', -42, true);
+  
+  // Guest 2 - ChessX device
+  renderChessXDevice(box, 'CHESS-X · Invitado', 'GUEST', 'María', -68, true);
+  
+  // Other devices section
+  const otherSection = document.createElement('div');
+  otherSection.className = 'dev-section';
+  otherSection.textContent = 'OTROS DISPOSITIVOS (2)';
+  box.appendChild(otherSection);
+  
+  // Other device 1
+  renderOtherDevice(box, 'iPhone de Juan', -55, true);
+  
+  // Other device 2
+  renderOtherDevice(box, 'Galaxy S23', -82, true);
+}
+
+// Demo: simulate multiple host devices found by guest
+function showDemoHostDevices() {
+  const box = $id('deviceBox');
+  if (!box || peerConnected) return;
+  
+  box.innerHTML = '';
+  
+  // CHESS-X devices section
+  const cxSection = document.createElement('div');
+  cxSection.className = 'dev-section chessx';
+  cxSection.textContent = '🟡 DISPOSITIVOS CHESS-X (2)';
+  box.appendChild(cxSection);
+  
+  // Host 1 - ChessX device
+  renderChessXDevice(box, 'CHESS-X · Anfitrión', 'HOST', 'Elal', -38, true);
+  
+  // Host 2 - ChessX device
+  renderChessXDevice(box, 'CHESS-X · Anfitrión', 'HOST', 'Ana', -72, true);
+  
+  // Other devices section
+  const otherSection = document.createElement('div');
+  otherSection.className = 'dev-section';
+  otherSection.textContent = 'OTROS DISPOSITIVOS (1)';
+  box.appendChild(otherSection);
+  
+  // Other device
+  renderOtherDevice(box, 'MacBook Pro', -88, true);
 }
 const TCS=[[0,'∞','Sin límite'],[60,'1+0','Relámpago'],[180,'3+0','Bala'],[180,'3+2','Bala+'],[300,'5+0','Rápidas'],[300,'5+3','Rápidas+'],[600,'10+0','Clásico'],[600,'10+5','Clásico+'],[900,'15+10','Larga'],[1800,'30+0','Media'],[3600,'60+0','Estándar']];
 let selTC='5+0';
@@ -916,16 +1032,87 @@ function applyPeerProfile(p){
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function showHostFound(msg){
   const box=$id('deviceBox'); if(!box)return; box.innerHTML='';
-  const d=document.createElement('button');d.className='dev-row';
-  d.innerHTML='<div class="dev-ic">'+esc((msg.name||'?').charAt(0).toUpperCase())+'</div><div class="dev-info"><b>'+esc(msg.name||'Anfitrión CHESS-X')+'</b><small>CHESS-X · Esperando jugadores</small></div><span class="dev-join">Conectar</span>';
-  d.onclick=()=>{peerSend({t:'JOIN'});const s=d.querySelector('.dev-join');if(s)s.textContent='Conectando…';Sound.click()};
-  box.appendChild(d);
+  const isChessX = msg.isChessX !== false;
+  const role = msg.role || 'HOST';
+  const username = msg.username || null;
+  const rssi = msg.rssi || -45;
+  
+  if (isChessX) {
+    renderChessXDevice(box, msg.name || 'Anfitrión CHESS-X', role, username, rssi, false);
+  } else {
+    renderOtherDevice(box, msg.name || 'Dispositivo Bluetooth', rssi, false);
+  }
 }
 function showGuestFound(msg){
   const box=$id('deviceBox'); if(!box)return; box.innerHTML='';
-  const d=document.createElement('div');d.className='dev-row';
-  d.innerHTML='<div class="dev-ic">'+esc((msg.name||'?').charAt(0).toUpperCase())+'</div><div class="dev-info"><b>'+esc(msg.name||'Invitado CHESS-X')+'</b><small>Te está buscando · espera a que se conecte</small></div><span class="dev-wait">Esperando…</span>';
-  box.appendChild(d);
+  const isChessX = msg.isChessX !== false;
+  const role = msg.role || 'GUEST';
+  const username = msg.username || null;
+  const rssi = msg.rssi || -55;
+  
+  if (isChessX) {
+    renderChessXDevice(box, msg.name || 'Invitado CHESS-X', role, username, rssi, true);
+  } else {
+    renderOtherDevice(box, msg.name || 'Dispositivo Bluetooth', rssi, true);
+  }
+}
+
+// Render CHESS-X device card (gold highlighted)
+function renderChessXDevice(container, name, role, username, rssi, isGuestMode) {
+  const roleText = role === 'HOST' ? 'Anfitrión' : role === 'GUEST' ? 'Invitado' : 'Desconocido';
+  const displayName = username && username.trim() ? username : roleText;
+  const subtitle = 'CHESS-X · ' + displayName;
+  const rssiClass = rssi >= -50 ? 'good' : rssi >= -70 ? 'fair' : rssi >= -85 ? 'weak' : 'poor';
+  const barsOn = rssi >= -50 ? 4 : rssi >= -70 ? 3 : rssi >= -85 ? 2 : 1;
+  
+  const d = document.createElement('div');
+  d.className = 'dev-cx found';
+  d.innerHTML = 
+    '<div class="av">♟</div>' +
+    '<div class="info">' +
+      '<div class="name">' + esc(name) + '</div>' +
+      '<div class="subtitle">' + esc(subtitle) + '</div>' +
+      '<div class="meta">' +
+        '<span class="rssi ' + rssiClass + '">' +
+          '<div class="bar b1' + (barsOn >= 1 ? ' on' : '') + '"></div>' +
+          '<div class="bar b2' + (barsOn >= 2 ? ' on' : '') + '"></div>' +
+          '<div class="bar b3' + (barsOn >= 3 ? ' on' : '') + '"></div>' +
+          '<div class="bar b4' + (barsOn >= 4 ? ' on' : '') + '"></div>' +
+        '</span>' +
+      '</div>' +
+    '</div>' +
+    (isGuestMode 
+      ? '<button class="btn-conn" onclick="peerSend({t:\'JOIN\'});this.textContent=\'Conectando…\';Sound.click()">Conectar →</button>'
+      : '<div class="btn-wait">Espera</div>');
+  container.appendChild(d);
+}
+
+// Render other Bluetooth device card
+function renderOtherDevice(container, name, rssi, isGuestMode) {
+  const rssiClass = rssi >= -50 ? 'good' : rssi >= -70 ? 'fair' : rssi >= -85 ? 'weak' : 'poor';
+  const barsOn = rssi >= -50 ? 4 : rssi >= -70 ? 3 : rssi >= -85 ? 2 : 1;
+  const initial = (name || 'D').charAt(0).toUpperCase();
+  
+  const d = document.createElement('div');
+  d.className = 'dev-other found';
+  d.innerHTML = 
+    '<div class="av">' + esc(initial) + '</div>' +
+    '<div class="info">' +
+      '<div class="name">' + esc(name) + '</div>' +
+      '<div class="subtitle">Dispositivo Bluetooth genérico</div>' +
+      '<div class="meta">' +
+        '<span class="rssi ' + rssiClass + '">' +
+          '<div class="bar b1' + (barsOn >= 1 ? ' on' : '') + '"></div>' +
+          '<div class="bar b2' + (barsOn >= 2 ? ' on' : '') + '"></div>' +
+          '<div class="bar b3' + (barsOn >= 3 ? ' on' : '') + '"></div>' +
+          '<div class="bar b4' + (barsOn >= 4 ? ' on' : '') + '"></div>' +
+        '</span>' +
+      '</div>' +
+    '</div>' +
+    (isGuestMode 
+      ? '<button class="btn-conn" onclick="Sound.click()">Conectar</button>'
+      : '<div class="btn-wait">Esperando…</div>');
+  container.appendChild(d);
 }
 function acceptPeer(msg){
   if(peerConnected)return;

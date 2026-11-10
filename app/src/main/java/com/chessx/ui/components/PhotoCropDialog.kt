@@ -13,8 +13,8 @@ import android.graphics.Matrix
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -55,7 +56,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -101,7 +101,7 @@ fun PhotoCropDialog(
             // tamaño dibujado para permitir desplazar sólo el desbordamiento real.
             val srcW = bitmap.width.toFloat().coerceAtLeast(1f)
             val srcH = bitmap.height.toFloat().coerceAtLeast(1f)
-            val fitScale = remember(frameSizePx, srcW, srcH) { min(frameSizePx / srcW, frameSizePx / srcH) }
+            val fitScale = remember(frameSizePx, srcW, srcH) { max(frameSizePx / srcW, frameSizePx / srcH) }
 
             Column(
                 modifier = Modifier.fillMaxSize(),
@@ -115,7 +115,7 @@ fun PhotoCropDialog(
                     fontWeight = FontWeight.ExtraBold
                 )
                 Text(
-                    "Pellizca para acercar · arrastra para posicionar",
+                    "Pellizca para acercar · arrastra para centrar · doble toque para restablecer",
                     color = Color(0xFF8B96A5),
                     fontSize = 11.sp,
                     modifier = Modifier.padding(top = 2.dp, bottom = 12.dp)
@@ -134,34 +134,37 @@ fun PhotoCropDialog(
                     Image(
                         bitmap = bitmap.asImageBitmap(),
                         contentDescription = "Foto a recortar",
-                        contentScale = ContentScale.Fit,
+                        contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .fillMaxSize()
+                            .graphicsLayer {
+                                scaleX = scale
+                                scaleY = scale
+                                translationX = offset.x
+                                translationY = offset.y
+                            }
                             .pointerInput(Unit) {
-                                detectTransformGestures { _, pan, zoom, _ ->
-                                    val newScale = (scale * zoom).coerceIn(1f, 5f)
-                                    scale = newScale
-                                    // Límite: el recuadro nunca sale de la foto
-                                    val drawnW = srcW * fitScale * scale
-                                    val drawnH = srcH * fitScale * scale
+                                detectTransformGestures { centroid, pan, zoom, _ ->
+                                    val oldScale = scale
+                                    val newScale = (oldScale * zoom).coerceIn(1f, 5f)
+                                    val center = Offset(size.width / 2f, size.height / 2f)
+                                    val anchor = centroid - center - offset
+                                    val zoomPan = anchor * (1f - newScale / oldScale)
+                                    val drawnW = srcW * fitScale * newScale
+                                    val drawnH = srcH * fitScale * newScale
                                     val maxX = max(0f, (drawnW - frameSizePx) / 2f)
                                     val maxY = max(0f, (drawnH - frameSizePx) / 2f)
-                                    val newX = (offset.x + pan.x).coerceIn(-maxX, maxX)
-                                    val newY = (offset.y + pan.y).coerceIn(-maxY, maxY)
+                                    val newX = (offset.x + pan.x + zoomPan.x).coerceIn(-maxX, maxX)
+                                    val newY = (offset.y + pan.y + zoomPan.y).coerceIn(-maxY, maxY)
+                                    scale = newScale
                                     offset = Offset(newX, newY)
                                 }
                             }
                             .pointerInput(Unit) {
-                                detectTapGestures(
-                                    onDoubleTap = {
-                                        if (scale > 1.05f) {
-                                            scale = 1f
-                                            offset = Offset.Zero
-                                        } else {
-                                            scale = 2.2f
-                                        }
-                                    }
-                                )
+                                detectTapGestures(onDoubleTap = {
+                                    scale = if (scale > 1.05f) 1f else 2.2f
+                                    offset = Offset.Zero
+                                })
                             },
                         alpha = 1f
                     )
@@ -245,51 +248,17 @@ private fun buildCroppedBitmap(
     scale: Float,
     offsetPx: Offset
 ): Bitmap {
-    // Área donde se dibujó la imagen (Fit): centrada, manteniendo relación de aspecto
     val bmpW = source.width.toFloat()
     val bmpH = source.height.toFloat()
-    val fitScale = min(viewSizePx / bmpW, viewSizePx / bmpH)
-    val drawnW = bmpW * fitScale * scale
-    val drawnH = bmpH * fitScale * scale
-
-    // Origen (esquina superior izq.) de la imagen dibujada, centrada + offset
-    val left = viewSizePx / 2f - drawnW / 2f + offsetPx.x
-    val top = viewSizePx / 2f - drawnH / 2f + offsetPx.y
-    val right = left + drawnW
-    val bottom = top + drawnH
-
-    // Región visible del recuadro centrado
-    val half = viewSizePx / 2f
-    val visLeft = viewSizePx / 2f - half
-    val visTop = viewSizePx / 2f - half
-    val visRight = visLeft + viewSizePx
-    val visBottom = visTop + viewSizePx
-
-    // Coordenadas de la región visible relativas a la imagen dibujada
-    val srcLeftAbs = ((visLeft - left) / (drawnW / bmpW)).coerceIn(0f, bmpW)
-    val srcTopAbs = ((visTop - top) / (drawnH / bmpH)).coerceIn(0f, bmpH)
-    val srcRightAbs = ((visRight - left) / (drawnW / bmpW)).coerceIn(0f, bmpW)
-    val srcBottomAbs = ((visBottom - top) / (drawnH / bmpH)).coerceIn(0f, bmpH)
-
-    var cropW = abs(srcRightAbs - srcLeftAbs)
-    var cropH = abs(srcBottomAbs - srcTopAbs)
-    // Si la imagen es más estrecha que el recuadro, ajustar a cuadrado sobre el ancho visible
-    if (cropW < 1f || cropH < 1f) {
-        // fallback: centro de la imagen
-        val s = min(bmpW, bmpH)
-        val cx = bmpW / 2f
-        val cy = bmpH / 2f
-        return Bitmap.createBitmap(source, (cx - s / 2f).toInt().coerceIn(0, max(0, source.width - s.toInt())), (cy - s / 2f).toInt().coerceIn(0, max(0, source.height - s.toInt())), s.toInt().coerceAtMost(source.width), s.toInt().coerceAtMost(source.height))
-    }
-    // Cuadrado exacto: usar el lado menor
-    val side = min(cropW, cropH)
-    cropW = side
-    cropH = side
-
-    val x = srcLeftAbs.toInt().coerceIn(0, max(0, source.width - side.toInt()))
-    val y = srcTopAbs.toInt().coerceIn(0, max(0, source.height - side.toInt()))
-    val s = side.toInt().coerceIn(1, min(source.width, source.height))
-    return Bitmap.createBitmap(source, x, y, s, s)
+    val baseScale = max(viewSizePx / bmpW, viewSizePx / bmpH)
+    val imageScale = baseScale * scale.coerceIn(1f, 5f)
+    val side = min(viewSizePx / imageScale, min(bmpW, bmpH)).coerceAtLeast(1f)
+    val centerX = bmpW / 2f - offsetPx.x / imageScale
+    val centerY = bmpH / 2f - offsetPx.y / imageScale
+    val x = (centerX - side / 2f).toInt().coerceIn(0, max(0, source.width - side.toInt()))
+    val y = (centerY - side / 2f).toInt().coerceIn(0, max(0, source.height - side.toInt()))
+    val pixelSide = side.toInt().coerceIn(1, min(source.width, source.height))
+    return Bitmap.createBitmap(source, x, y, pixelSide, pixelSide)
 }
 
 /** Utilidad: reduce un bitmap grande antes de mostrar el diálogo. */

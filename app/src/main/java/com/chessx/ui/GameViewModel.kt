@@ -92,6 +92,14 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
         bluetooth = BluetoothClassicManager(appContext, viewModelScope)
         sound = SoundManager(appContext)
         checkSignalEnabled = appContext.getSharedPreferences("chessbt_prefs", Context.MODE_PRIVATE).getBoolean("check_sig", true)
+        
+        // Connection notification callback
+        bluetooth.onConnected = {
+            sound.play(SoundType.CLICK)
+            _ui.value = _ui.value.copy(lastError = "¡${_ui.value.remoteName.ifBlank { "Rival" }} conectado!")
+            viewModelScope.launch { delay(3000); _ui.value = _ui.value.copy(lastError = null) }
+        }
+        
         clock = ClockManager(
             viewModelScope, isHost = false,
             onSyncRequest = { msg -> bluetooth.send(msg) },
@@ -119,7 +127,6 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
     private fun observeBluetooth() {
         viewModelScope.launch {
             bluetooth.incoming.collect { msg ->
-                if (msg == null) return@collect
                 try { handleIncoming(msg) } catch (e: Exception) { /* never crash */ }
             }
         }
@@ -142,6 +149,7 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
     fun setLocalName(name: String) {
         localName = name.trim().ifBlank { (100000 + java.util.Random().nextInt(900000)).toString() }.take(20)
         _ui.value = _ui.value.copy(localName = localName, lobby = _ui.value.lobby.copy(localName = localName))
+        bluetooth.updateHostName(localName)
     }
 
     fun setIsHost(host: Boolean) {
@@ -202,21 +210,29 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
 
     /** JSON con el historial (máx 30 partidas). PGN incluida sólo si sharePgn. */
     private fun buildHistoryJson(records: List<GameRecord>, sharePgn: Boolean): String {
-        return try {
-            val arr = JSONArray()
-            records.take(30).forEach { r ->
-                val o = JSONObject()
-                o.put("d", r.dateMs)
-                o.put("res", r.result)
-                r.localWon?.let { o.put("lw", it) }
-                o.put("n", r.movesSan.size)
-                o.put("t", r.timeLabel)
-                o.put("me", r.playerName)
-                o.put("opp", r.opponent)
-                arr.put(o)
-            }
-            arr.toString()
-        } catch (_: Exception) { "[]" }
+    val arr = JSONArray()
+    for (r in records.take(30)) {
+        val o = JSONObject()
+        o.put("d", r.dateMs)
+        o.put("res", r.result)
+        r.localWon?.let { o.put("lw", it) }
+        o.put("n", r.movesSan.size)
+        o.put("t", r.timeLabel)
+        o.put("me", r.playerName)
+        o.put("opp", r.opponent)
+        o.put("white", r.localColorWhite)
+        if (sharePgn) {
+            o.put("san", JSONArray(r.movesSan))
+            o.put("uci", JSONArray(r.uciMoves))
+            o.put("pgn", r.pgn)
+        }
+        arr.put(o)
+        if (arr.toString().length > 15_000) {
+            arr.remove(arr.length() - 1)
+            break
+        }
+    }
+    return arr.toString()
     }
 
     /** Reduce la foto de perfil a <=128px JPEG para que quepa por SPP. */
@@ -249,12 +265,20 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
                     moves = o.optInt("n", 0),
                     timeLabel = o.optString("t", ""),
                     playerName = o.optString("me", ""),
-                    opponent = o.optString("opp", "")
+                    opponent = o.optString("opp", ""),
+                    localColorWhite = o.optBoolean("white", true),
+                    movesSan = jsonStringList(o.optJSONArray("san")),
+                    uciMoves = jsonStringList(o.optJSONArray("uci")),
+                    pgn = o.optString("pgn", "")
                 ))
             }
             out
         } catch (_: Exception) { emptyList() }
     }
+
+    private fun jsonStringList(array: JSONArray?): List<String> =
+        array?.let { values -> (0 until values.length()).mapNotNull { index -> values.optString(index).takeIf { it.isNotBlank() } } }
+            ?: emptyList()
 
     private fun handleProfileMessage(msg: ProfileMessage) {
         _remoteProfile.value = RemoteProfile(
@@ -283,7 +307,7 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
 
     fun startGameAsHost() {
         if (!isHost) return
-        if (_ui.value.remoteName.isBlank() || !_ui.value.connected) {
+        if (!_ui.value.connected) {
             showError("Conecta con el rival antes de comenzar")
             return
         }
@@ -409,7 +433,7 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
             lobby = _ui.value.lobby.copy(
                 gameStarted = true, connected = true,
                 localColor = myColor, remoteColor = myColor.opposite(),
-                timeMs = timeMs, incrementMs = incMs, colorRandom = false,
+                timeMs = timeMs, incrementMs = incMs,                 colorRandom = false,
                 isHost = _ui.value.lobby.isHost // preserve host role
             )
         )
@@ -436,7 +460,13 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
             localColor = local, remoteColor = hostColor,
             localName = localName, remoteName = msg.hostName.ifBlank { "Anfitrión" },
             isLocalTurn = local == Color.WHITE,
-            lobby = _ui.value.lobby.copy(gameStarted = true, connected = true, timeMs = msg.timeMs, incrementMs = msg.incrementMs, isHost = false),
+            lobby = _ui.value.lobby.copy(
+                gameStarted = true,
+                connected = true,
+                timeMs = msg.timeMs,
+                incrementMs = msg.incrementMs,
+                isHost = false
+            ),
             gameEnd = null, paused = false, countdown = null, promotionPending = null,
             inCheck = false, checkKing = null, selection = BoardSelection(null),
             history = emptyList()
@@ -696,6 +726,11 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
                 when (msg.mode) {
                     "same" -> startGameInternal(lastLocalColor, _ui.value.lobby.timeMs, _ui.value.lobby.incrementMs)
                     "random" -> startGameInternal(randomSide(), _ui.value.lobby.timeMs, _ui.value.lobby.incrementMs)
+                    "custom" -> {
+                        val timeMs = if (msg.timeMs > 0) msg.timeMs else _ui.value.lobby.timeMs
+                        val incMs = if (msg.incrementMs >= 0) msg.incrementMs else _ui.value.lobby.incrementMs
+                        startGameInternal(lastLocalColor, timeMs, incMs)
+                    }
                     "tournament" -> advanceTournament()
                 }
             }
@@ -719,6 +754,11 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
             val blackName = if (localColor == Color.WHITE) opp else localName
             val lobby = _ui.value.lobby
             val tcLabel = if (lobby.timeMs == 0L) "∞ + 0" else "${lobby.timeMs / 60000} + ${lobby.incrementMs / 1000}"
+            
+            // Get opponent photo from remote profile
+            val remoteProfile = _remoteProfile.value
+            val opponentPhoto = remoteProfile?.photoBase64
+            
             val base = GameRecord(
                 opponent = opp,
                 playerName = localName,
@@ -730,10 +770,17 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
                 pgn = "",
                 finalFen = engine.toFEN(),
                 uciMoves = uciHistory.toList(),
-                moveClocks = moveClockHistory.toList()
+                moveClocks = moveClockHistory.toList(),
+                opponentPhotoBase64 = opponentPhoto
             )
             GameHistoryStore.append(appContext, base.copy(pgn = buildPgn(base, whiteName, blackName)))
         } catch (_: Exception) { }
+    }
+
+    /** Solicita nueva partida con control de tiempo personalizado (solo host). */
+    fun requestNewGameCustom(timeMs: Long, incrementMs: Long) {
+        if (isHost) startGameInternal(lastLocalColor, timeMs, incrementMs)
+        else bluetooth.send(RematchMessage("custom", localName, timeMs, incrementMs))
     }
 
     private fun Log_w(tag: String, e: Exception) { android.util.Log.w("VM", "handle $tag", e) }

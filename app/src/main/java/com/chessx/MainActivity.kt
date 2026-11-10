@@ -15,10 +15,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -28,6 +29,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -89,13 +92,24 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(
                 colorScheme = darkColorScheme(
-                    background = Color(0xFF0B0D10), surface = Color(0xFF13171D), surfaceVariant = Color(0xFF171D25),
-                    primary = Color(0xFFE2B94E), onPrimary = Color(0xFF141414),
-                    onBackground = Color(0xFFEEF1F5), onSurface = Color(0xFFEEF1F5),
-                    onSurfaceVariant = Color(0xFF8B96A5), outline = Color(0xFF2F3947)
+                    background = Color(0xFF090C10), surface = Color(0xFF121A22), surfaceVariant = Color(0xFF1B242D),
+                    primary = Color(0xFFE2B94E), onPrimary = Color(0xFF131313),
+                    onBackground = Color(0xFFEFF3F8), onSurface = Color(0xFFEFF3F8),
+                    onSurfaceVariant = Color(0xFF9CA8B4), outline = Color(0xFF2C3742)
                 )
             ) {
-                Surface(modifier = Modifier.background(Color(0xFF0B0D10))) {
+                Surface(
+                    modifier = Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color(0xFF0A0D12),
+                                Color(0xFF111821),
+                                Color(0xFF0B0D10)
+                            )
+                        )
+                    ),
+                    color = Color.Transparent
+                ) {
                     ChessApp(vm, prefs, this@MainActivity, permissionLauncher, discoverableLauncher)
                 }
             }
@@ -127,8 +141,10 @@ fun ChessApp(
     permissionLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>,
     discoverableLauncher: androidx.activity.result.ActivityResultLauncher<Intent>
 ) {
-    var screen by remember { mutableStateOf(Screen.HOME) }
+    var screen by remember { mutableStateOf(if (prefs.profileConfigured) Screen.HOME else Screen.PROFILE) }
     var isHostMode by remember { mutableStateOf(false) }
+    var profileNextScreen by remember { mutableStateOf(Screen.HOME) }
+    var connectReturnScreen by remember { mutableStateOf(Screen.HOME) }
     var fullscreen by remember { mutableStateOf(false) }
     var history by remember { mutableStateOf(GameHistoryStore.load(activity)) }
     var replayRecord by remember { mutableStateOf<GameRecord?>(null) }
@@ -142,9 +158,38 @@ fun ChessApp(
     val btError by vm.bluetooth.lastError.collectAsState()
     val remoteProfile by vm.remoteProfile.collectAsState()
     val isEn = prefs.language == AppLanguage.EN
+    val startHostListening: () -> Unit = {
+        vm.bluetooth.setVisibleDeviceName("${prefs.profileName} · Anfitrión")
+        try {
+            discoverableLauncher.launch(discoverableIntent())
+        } catch (_: Exception) {
+            try { vm.bluetooth.hostListen() } catch (_: Exception) {}
+        }
+    }
+    val startGuestScanning: () -> Unit = {
+        vm.bluetooth.setVisibleDeviceName("${prefs.profileName} · Invitado")
+        vm.bluetooth.startDiscovery()
+    }
+    val continueFromProfile: () -> Unit = {
+        prefs.completeProfile()
+        when (profileNextScreen) {
+            Screen.ROOM -> screen = Screen.ROOM
+            Screen.CONNECT -> {
+                screen = Screen.CONNECT
+                if (isHostMode) startHostListening() else startGuestScanning()
+            }
+            Screen.GAME -> screen = Screen.GAME
+            Screen.SETTINGS -> screen = Screen.SETTINGS
+            else -> screen = Screen.HOME
+        }
+        profileNextScreen = Screen.HOME
+    }
 
     LaunchedEffect(prefs.soundEnabled, prefs.soundVolume) {
         try { vm.sound.setEnabled(prefs.soundEnabled); vm.sound.setVolume(prefs.soundVolume) } catch (_: Exception) {}
+    }
+    LaunchedEffect(prefs.soundPack) {
+        try { vm.sound.setPack(prefs.soundPack) } catch (_: Exception) {}
     }
     LaunchedEffect(prefs.profileName) { vm.setLocalName(prefs.profileName) }
 
@@ -159,10 +204,11 @@ fun ChessApp(
     }
 
     LaunchedEffect(btState) {
-        if (btState == BtState.CONNECTED && screen == Screen.CONNECT) {
-            screen = Screen.ROOM
+        if (btState == BtState.CONNECTED) {
             vm.sendHello()
             vm.sendProfile()
+            if (ui.lobby.isHost) vm.sendLobbyConfig()
+            if (screen == Screen.CONNECT) screen = Screen.ROOM
         }
     }
     LaunchedEffect(ui.lobby.gameStarted) {
@@ -175,17 +221,25 @@ fun ChessApp(
                 Screen.HOME -> HomeScreen(
                     inSession = btState == BtState.CONNECTED,
                     isGuestSession = btState == BtState.CONNECTED && !ui.lobby.isHost,
+                    profileName = prefs.profileName,
+                    profilePhotoBase64 = prefs.profilePhotoBase64,
+                    clockSummary = if (prefs.defaultTimeMs == 0L) "∞" else "${prefs.defaultTimeMs / 60_000} + ${prefs.defaultIncrementMs / 1_000}",
+                    onProfile = {
+                        profileNextScreen = Screen.HOME
+                        screen = Screen.PROFILE
+                    },
                     onCreate = {
-                        isHostMode = true; vm.setIsHost(true); screen = Screen.CONNECT
-                        vm.bluetooth.startDiscovery()
-                        try { discoverableLauncher.launch(discoverableIntent()) } catch (_: Exception) {}
+                        isHostMode = true
+                        vm.setIsHost(true)
+                        profileNextScreen = Screen.ROOM
+                        screen = Screen.PROFILE
                     },
                     onSearch = {
-                        isHostMode = false; vm.setIsHost(false); screen = Screen.CONNECT
-                        vm.bluetooth.startDiscovery()
+                        isHostMode = false
+                        vm.setIsHost(false)
+                        profileNextScreen = Screen.CONNECT
+                        screen = Screen.PROFILE
                     },
-                    soundEnabled = prefs.soundEnabled,
-                    onToggleSound = { prefs.setSoundEnabled(!prefs.soundEnabled) }
                 )
 
                 Screen.CONNECT -> ConnectScreen(
@@ -193,22 +247,25 @@ fun ChessApp(
                     myName = ui.localName.ifBlank { prefs.profileName },
                     remoteName = ui.remoteName,
                     remoteProfile = remoteProfile,
+                    boardTheme = prefs.boardTheme,
+                    pieceSet = prefs.pieceSet,
+                    showCoordinates = prefs.showCoordinates,
                     onViewRivalProfile = { showRivalProfile = true },
                     onChooseRole = { host ->
                         isHostMode = host; vm.setIsHost(host)
                         if (host) {
-                            try { discoverableLauncher.launch(discoverableIntent()) } catch (_: Exception) { try { vm.bluetooth.hostListen() } catch (_: Exception) {} }
+                            startHostListening()
                         } else {
-                            vm.bluetooth.startDiscovery()
+                            startGuestScanning()
                         }
                     },
                     onHostListen = {
                         isHostMode = true; vm.setIsHost(true)
-                        try { discoverableLauncher.launch(discoverableIntent()) } catch (_: Exception) { try { vm.bluetooth.hostListen() } catch (_: Exception) {} }
+                        startHostListening()
                     },
                     onSearch = {
                         isHostMode = false; vm.setIsHost(false)
-                        vm.bluetooth.startDiscovery()
+                        startGuestScanning()
                     },
                     onConnect = { addr -> vm.bluetooth.connectTo(addr) },
                     onBack = { screen = Screen.HOME }
@@ -221,8 +278,12 @@ fun ChessApp(
                     remoteProfile = remoteProfile,
                     connected = btState == BtState.CONNECTED,
                     onViewRivalProfile = { showRivalProfile = true },
-                    onConnect = { screen = Screen.CONNECT },
-                    onGoRoom = { screen = Screen.ROOM },
+                    continueLabel = when (profileNextScreen) {
+                        Screen.ROOM -> "Continuar · configurar partida"
+                        Screen.CONNECT -> "Continuar · buscar rival"
+                        else -> "Guardar perfil y continuar"
+                    },
+                    onContinue = continueFromProfile,
                     onNameChange = { prefs.setProfileName(it); vm.setLocalName(it); vm.sendHello(); vm.sendProfile() },
                     onReplay = { replayRecord = it; screen = Screen.REPLAY },
                     onDeleteGame = { rec -> GameHistoryStore.remove(activity, rec.id); history = GameHistoryStore.load(activity) },
@@ -239,34 +300,43 @@ fun ChessApp(
                     onTimePick = { timeMs, inc -> vm.setTimeControl(timeMs, inc); if (ui.lobby.isHost) vm.sendLobbyConfig() },
                     onColorPick = { color -> vm.setLocalColor(color) },
                     onRandomColor = { vm.setRandomColor() },
-                    onStartGame = { vm.startGameAsHost() },
+                    onConnect = {
+                        isHostMode = true
+                        vm.setIsHost(true)
+                        connectReturnScreen = Screen.ROOM
+                        screen = Screen.CONNECT
+                        startHostListening()
+                    },
+                    onStartGame = vm::startGameAsHost,
                     onStartTournament = { games -> vm.startTournament(games, ui.lobby.timeMs, ui.lobby.incrementMs) },
                     onBack = { screen = Screen.HOME; vm.disconnect() }
                 )
 
                 Screen.REPLAY -> {
                     val rec = replayRecord
-                    if (rec != null) ReplayScreen(rec, onBack = { screen = Screen.PROFILE })
+                    if (rec != null) ReplayScreen(rec, showCoordinates = prefs.showCoordinates, onBack = { screen = Screen.PROFILE })
                     else LobbyScreen(
                         lobby = ui.lobby, localName = ui.localName, remoteName = ui.remoteName,
                         photoBase64 = prefs.profilePhotoBase64, history = history,
                         remoteProfile = remoteProfile,
                         connected = btState == BtState.CONNECTED,
                         onViewRivalProfile = { showRivalProfile = true },
-                        onConnect = { screen = Screen.CONNECT },
-                        onGoRoom = { screen = Screen.ROOM },
+                        continueLabel = "Volver al perfil",
+                        onContinue = { screen = Screen.PROFILE },
                         onNameChange = { prefs.setProfileName(it); vm.setLocalName(it); vm.sendHello(); vm.sendProfile() },
                         onReplay = { replayRecord = it; screen = Screen.REPLAY },
                         onDeleteGame = { r -> GameHistoryStore.remove(activity, r.id); history = GameHistoryStore.load(activity) },
                         onClearHistory = { GameHistoryStore.clear(activity); history = emptyList() },
                         onPhotoCropped = { prefs.setProfilePhotoBase64(it); vm.sendProfile() },
-                        onBack = { screen = Screen.HOME }
+                        onBack = { screen = connectReturnScreen }
                     )
                 }
 
                 Screen.GAME -> GameScreen(
                     ui = ui, isFullscreen = fullscreen, boardTheme = prefs.boardTheme,
+                    pieceSet = prefs.pieceSet,
                     moveIndicators = prefs.moveIndicators,
+                    showCoordinates = prefs.showCoordinates,
                     localPhotoBase64 = prefs.profilePhotoBase64,
                     remoteProfile = remoteProfile,
                     onViewRivalProfile = { showRivalProfile = true },
@@ -286,7 +356,18 @@ fun ChessApp(
                     onTournamentNext = { vm.requestNewGame("tournament") },
                     onBackToRoom = { vm.backToRoom() },
                     onGameEndDismiss = { },
-                    onNewTournament = { screen = Screen.ROOM }
+                    onNewTournament = { screen = Screen.ROOM },
+                    onReplayPgn = {
+                        // Get the last finished game record for replay
+                        val history = GameHistoryStore.load(activity)
+                        if (history.isNotEmpty()) {
+                            replayRecord = history[0]
+                            screen = Screen.REPLAY
+                        }
+                    },
+                    onNewGameCustomTime = { timeMs, incMs ->
+                        vm.requestNewGameCustom(timeMs, incMs)
+                    }
                 )
 
                 Screen.SETTINGS -> SettingsScreen(
@@ -295,33 +376,94 @@ fun ChessApp(
                     onOpenBtSettings = {
                         try { activity.startActivity(Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS)) } catch (_: Exception) {}
                     },
-                    onExit = { activity.finish() }
+                    onExit = { activity.finish() },
+                    activity = activity
                 )
             }
         }
 
         if (!(screen == Screen.GAME && fullscreen)) {
-            BottomNav(current = when {
-                screen == Screen.REPLAY -> Screen.PROFILE
-                screen == Screen.ROOM -> Screen.GAME
-                else -> screen
-            }, isEn = isEn, onSelect = { target ->
+            BottomNav(current = if (screen == Screen.REPLAY) Screen.PROFILE else screen, isEn = isEn, onSelect = { target ->
                 when (target) {
-                    Screen.HOME -> { fullscreen = false; screen = Screen.HOME }
-                    Screen.CONNECT -> { fullscreen = false; screen = Screen.CONNECT }
-                    Screen.PROFILE, Screen.REPLAY -> { fullscreen = false; screen = Screen.PROFILE }
-                    Screen.ROOM, Screen.GAME -> screen = when {
-                        ui.lobby.gameStarted -> Screen.GAME
-                        btState == BtState.CONNECTED -> Screen.ROOM
-                        else -> Screen.CONNECT
+                    Screen.HOME -> {
+                        fullscreen = false
+                        screen = Screen.HOME
                     }
-                    Screen.SETTINGS -> { fullscreen = false; screen = Screen.SETTINGS }
+                    Screen.CONNECT -> {
+                        fullscreen = false
+                        connectReturnScreen = if (screen == Screen.ROOM) Screen.ROOM else Screen.HOME
+                        if (!prefs.profileConfigured) {
+                            profileNextScreen = Screen.CONNECT
+                            screen = Screen.PROFILE
+                        } else {
+                            screen = Screen.CONNECT
+                            if (isHostMode) startHostListening() else startGuestScanning()
+                        }
+                    }
+                    Screen.PROFILE, Screen.REPLAY -> {
+                        fullscreen = false
+                        profileNextScreen = when (screen) {
+                            Screen.ROOM -> Screen.ROOM
+                            Screen.CONNECT -> Screen.CONNECT
+                            Screen.GAME -> Screen.GAME
+                            Screen.SETTINGS -> Screen.SETTINGS
+                            else -> Screen.HOME
+                        }
+                        screen = Screen.PROFILE
+                    }
+                    Screen.ROOM -> {
+                        fullscreen = false
+                        if (!prefs.profileConfigured) {
+                            profileNextScreen = Screen.ROOM
+                            screen = Screen.PROFILE
+                        } else {
+                            if (!ui.lobby.connected && btState == BtState.IDLE && !isHostMode) {
+                                isHostMode = true
+                                vm.setIsHost(true)
+                            }
+                            screen = Screen.ROOM
+                        }
+                    }
+                    Screen.GAME -> {
+                        fullscreen = false
+                        screen = when {
+                            ui.lobby.gameStarted -> Screen.GAME
+                            isHostMode -> Screen.ROOM
+                            btState == BtState.CONNECTED -> Screen.ROOM
+                            else -> Screen.CONNECT
+                        }
+                    }
+                    Screen.SETTINGS -> {
+                        fullscreen = false
+                        screen = Screen.SETTINGS
+                    }
                 }
             })
         }
 
         if (showRivalProfile && remoteProfile != null) {
-            RivalProfileDialog(profile = remoteProfile!!, onDismiss = { showRivalProfile = false })
+            RivalProfileDialog(
+                profile = remoteProfile!!,
+                onDismiss = { showRivalProfile = false },
+                onReplay = { game ->
+                    replayRecord = GameRecord(
+                        id = "remote-${game.dateMs}-${game.moves}",
+                        dateMs = game.dateMs,
+                        opponent = game.opponent,
+                        result = game.result,
+                        localWon = game.won,
+                        localColorWhite = game.localColorWhite,
+                        timeLabel = game.timeLabel,
+                        movesSan = game.movesSan,
+                        pgn = game.pgn,
+                        finalFen = "",
+                        playerName = game.playerName,
+                        uciMoves = game.uciMoves
+                    )
+                    showRivalProfile = false
+                    screen = Screen.REPLAY
+                }
+            )
         }
     }
 }
@@ -332,9 +474,10 @@ private data class NavEntry(val screen: Screen, val labelEs: String, val labelEn
 private fun BottomNav(current: Screen, isEn: Boolean, onSelect: (Screen) -> Unit) {
     val entries = listOf(
         NavEntry(Screen.HOME, "Inicio", "Home", Icons.Filled.Home),
-        NavEntry(Screen.CONNECT, "Conectar", "Connect", Icons.Filled.Search),
         NavEntry(Screen.PROFILE, "Perfil", "Profile", Icons.Filled.Person),
-        NavEntry(Screen.GAME, "Partida", "Game", Icons.Filled.PlayArrow),
+        NavEntry(Screen.ROOM, "Partida", "Game", Icons.Filled.Tune),
+        NavEntry(Screen.CONNECT, "Conectar", "Connect", Icons.Filled.Search),
+        NavEntry(Screen.GAME, "Tablero", "Board", Icons.Filled.PlayArrow),
         NavEntry(Screen.SETTINGS, "Ajustes", "Settings", Icons.Filled.Settings)
     )
     Column(Modifier.fillMaxWidth()) {
@@ -348,12 +491,12 @@ private fun BottomNav(current: Screen, isEn: Boolean, onSelect: (Screen) -> Unit
                 Column(
                     modifier = Modifier.weight(1f).clip(RoundedCornerShape(10.dp))
                         .background(if (active) Color(0xFF1C232D) else Color.Transparent)
-                        .clickable { onSelect(entry.screen) }.padding(vertical = 6.dp),
+                        .clickable { onSelect(entry.screen) }.padding(vertical = 5.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Icon(entry.icon, contentDescription = null, tint = if (active) NavGold else NavMuted, modifier = Modifier.size(18.dp))
-                    Text(if (isEn) entry.labelEn else entry.labelEs, color = if (active) NavGold else NavMuted, fontSize = 9.5.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                    Icon(entry.icon, contentDescription = null, tint = if (active) NavGold else NavMuted, modifier = Modifier.size(17.dp))
+                    Text(if (isEn) entry.labelEn else entry.labelEs, color = if (active) NavGold else NavMuted, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                 }
             }
         }

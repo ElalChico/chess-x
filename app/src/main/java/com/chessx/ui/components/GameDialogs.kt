@@ -6,26 +6,23 @@
 
 package com.chessx.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -35,7 +32,21 @@ import androidx.compose.ui.window.DialogProperties
 import com.chessx.R
 import com.chessx.core.Color as ChessColor
 import com.chessx.core.GameEnd
+import com.chessx.core.Piece
 import com.chessx.core.PieceType
+import com.chessx.data.PieceSet
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.util.Base64
+
+private fun decodePhoto(base64: String?): Bitmap? {
+    if (base64.isNullOrBlank()) return null
+    val raw = base64.substringAfter("base64,", base64)
+    return try {
+        val bytes = Base64.decode(raw, Base64.DEFAULT)
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    } catch (_: Exception) { null }
+}
 
 // ---------- Fin de partida ----------
 
@@ -45,14 +56,33 @@ fun GameEndDialog(
     isHost: Boolean,
     tournamentActive: Boolean,
     tournamentFinished: Boolean,
+    localName: String,
+    remoteName: String,
+    localPhotoBase64: String = "",
+    remotePhotoBase64: String? = null,
+    winnerName: String? = null,
     onNewGameSame: () -> Unit,
     onNewGameRandom: () -> Unit,
     onTournamentNext: () -> Unit,
     onBackToRoom: () -> Unit,
+    onReplayPgn: () -> Unit,
+    onNewGameCustomTime: (Long, Long) -> Unit, // timeMs, incrementMs
     onDismiss: () -> Unit
 ) {
     val resultColorStr = if (end.winner == null) "draw" else
         (if (end.winner == ChessColor.WHITE) "white" else "black")
+
+    val winnerDisplayName = winnerName ?: (when (resultColorStr) {
+        "white" -> if (localName.isNotBlank()) localName else "Blancas"
+        "black" -> if (remoteName.isNotBlank()) remoteName else "Negras"
+        else -> "Empate"
+    })
+
+    val winnerPhoto = when (resultColorStr) {
+        "white" -> localPhotoBase64
+        "black" -> remotePhotoBase64
+        else -> null
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -71,21 +101,63 @@ fun GameEndDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = when (resultColorStr) {
-                        "white" -> "¡BLANCAS GANAN!"
-                        "black" -> "¡NEGRAS GANAN!"
-                        else -> "¡TABLAS!"
-                    },
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = when (resultColorStr) {
-                        "white" -> Color(0xFFFF6B6B)
-                        "black" -> Color(0xFF5B9DF9)
-                        else -> Color(0xFF3DDC97)
-                    },
-                    textAlign = TextAlign.Center
-                )
+                // Winner announcement with photo
+                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Winner photo
+                    if (winnerPhoto != null) {
+                        val bmp = remember(winnerPhoto) { decodePhoto(winnerPhoto) }
+                        Box(
+                            modifier = Modifier
+                                .size(72.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF15251D), CircleShape)
+                                .border(3.dp, Color(0xFFE2B94E), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (bmp != null) {
+                                Image(
+                                    bitmap = bmp.asImageBitmap(),
+                                    contentDescription = winnerDisplayName,
+                                    modifier = Modifier.fillMaxSize().clip(CircleShape)
+                                )
+                            } else {
+                                Text(
+                                    winnerDisplayName.firstOrNull()?.uppercaseChar().toString() ?: "?",
+                                    fontSize = 28.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    color = Color(0xFFE2B94E)
+                                )
+                            }
+                        }
+                    }
+                    
+                    Text(
+                        text = when (resultColorStr) {
+                            "white" -> "¡BLANCAS GANAN!"
+                            "black" -> "¡NEGRAS GANAN!"
+                            else -> "¡TABLAS!"
+                        },
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = when (resultColorStr) {
+                            "white" -> Color(0xFFFF6B6B)
+                            "black" -> Color(0xFF5B9DF9)
+                            else -> Color(0xFF3DDC97)
+                        },
+                        textAlign = TextAlign.Center
+                    )
+                    
+                    if (resultColorStr != "draw") {
+                        Text(
+                            text = winnerDisplayName,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFE2B94E),
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+
                 Text(
                     text = end.message.ifBlank { "Partida finalizada" },
                     fontSize = 12.5.sp,
@@ -130,6 +202,19 @@ fun GameEndDialog(
                     highlight = false,
                     onClick = onNewGameRandom
                 )
+                
+                // Quick time control buttons
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    QuickTimeBtn("5+0", 300000, 0, Modifier.weight(1f)) { onNewGameCustomTime(300000, 0) }
+                    QuickTimeBtn("3+2", 180000, 2000, Modifier.weight(1f)) { onNewGameCustomTime(180000, 2000) }
+                    QuickTimeBtn("10+0", 600000, 0, Modifier.weight(1f)) { onNewGameCustomTime(600000, 0) }
+                    QuickTimeBtn("15+10", 900000, 10000, Modifier.weight(1f)) { onNewGameCustomTime(900000, 10000) }
+                }
+                Spacer(Modifier.height(4.dp))
+
                 if (tournamentActive && !tournamentFinished) {
                     EndGameOption(
                         title = "Siguiente torneo",
@@ -139,6 +224,13 @@ fun GameEndDialog(
                         onClick = onTournamentNext
                     )
                 }
+                EndGameOption(
+                    title = "Reproducir PGN",
+                    subtitle = "Ver la partida completa",
+                    enabled = true,
+                    highlight = false,
+                    onClick = onReplayPgn
+                )
                 EndGameOption(
                     title = "Volver a la sala",
                     subtitle = "Continuar en el lobby del rival",
@@ -181,6 +273,22 @@ private fun EndGameOption(title: String, subtitle: String, enabled: Boolean, hig
             Text(subtitle, fontSize = 11.sp, color = Color(0xFF8B96A5))
         }
         Text("→", color = if (highlight) Color(0xFFE2B94E) else Color(0xFF232C38), fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+    }
+}
+
+@Composable
+private fun QuickTimeBtn(label: String, timeMs: Long, incMs: Long, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val timeText = if (timeMs == 0L) "∞" else "${timeMs / 60000}"
+    val incText = if (incMs == 0L) "+0" else "+${incMs / 1000}"
+    Box(
+        modifier = modifier
+            .background(Color(0xFF151C25), RoundedCornerShape(10.dp))
+            .border(1.dp, Color(0xFF232C38), RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 8.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("$timeText$incText", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color(0xFFE2B94E))
     }
 }
 
@@ -310,6 +418,7 @@ private fun pieceRes(pieceType: PieceType, color: ChessColor): Int = when (piece
 @Composable
 fun PromotionPieceDialog(
     localColor: ChessColor,
+    pieceSet: PieceSet = PieceSet.DEFAULT,
     onPromote: (PieceType) -> Unit,
     onCancel: () -> Unit
 ) {
@@ -350,11 +459,19 @@ fun PromotionPieceDialog(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.clickable { onPromote(pt) }
                         ) {
-                            androidx.compose.foundation.Image(
-                                painter = androidx.compose.ui.res.painterResource(id = pieceRes(pt, localColor)),
-                                contentDescription = pt.name,
-                                modifier = Modifier.size(46.dp)
-                            )
+                            if (pieceSet == PieceSet.LICHESS) {
+                                androidx.compose.foundation.Image(
+                                    painter = androidx.compose.ui.res.painterResource(id = pieceRes(pt, localColor)),
+                                    contentDescription = pt.name,
+                                    modifier = Modifier.size(46.dp)
+                                )
+                            } else {
+                                com.chessx.ui.components.PieceIcon(
+                                    piece = Piece(pt, localColor),
+                                    modifier = Modifier.size(46.dp),
+                                    pieceSet = pieceSet
+                                )
+                            }
                             Text(
                                 pt.name.take(1).uppercase(),
                                 fontSize = 11.sp,

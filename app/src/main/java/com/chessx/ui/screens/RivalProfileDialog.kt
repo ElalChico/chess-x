@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.chessx.data.RemoteProfile
+import com.chessx.data.RemoteGame
 import android.graphics.BitmapFactory
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.font.FontWeight
@@ -66,7 +67,12 @@ private fun Avatar(photo: String?, name: String, size: Int) {
 
 /** Diálogo centrado con el perfil del rival recibido por Bluetooth. */
 @Composable
-fun RivalProfileDialog(profile: RemoteProfile, onDismiss: () -> Unit) {
+fun RivalProfileDialog(
+    profile: RemoteProfile,
+    onDismiss: () -> Unit,
+    onReplay: (RemoteGame) -> Unit = {}
+) {
+    var visiblePgnIndex by remember(profile.name) { mutableIntStateOf(-1) }
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
@@ -103,7 +109,7 @@ fun RivalProfileDialog(profile: RemoteProfile, onDismiss: () -> Unit) {
                 Text("El rival no ha compartido historial (revisa su Ajustes → Compartir).", color = Muted, fontSize = 12.sp)
             } else {
                 Column(modifier = Modifier.heightIn(max = 230.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    profile.games.take(20).forEach { g ->
+                    profile.games.take(20).forEachIndexed { index, g ->
                         Row(
                             modifier = Modifier.fillMaxWidth().background(Color(0xFF10151C), RoundedCornerShape(10.dp)).padding(10.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -112,10 +118,39 @@ fun RivalProfileDialog(profile: RemoteProfile, onDismiss: () -> Unit) {
                                 Text(g.dateLabel(), color = Text1, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
                                 Text("${g.moves} jugadas · ${g.timeLabel.ifBlank { "—" }} · vs ${g.opponent.ifBlank { "?" }}", color = Muted, fontSize = 10.sp)
                             }
+                            Column(horizontalAlignment = Alignment.End) {
+                                Text(
+                                    when (g.won) { true -> "Victoria"; false -> "Derrota"; null -> "Empate" },
+                                    color = when (g.won) { true -> Green; false -> Red; null -> Muted },
+                                    fontSize = 10.sp, fontWeight = FontWeight.Bold
+                                )
+                                Row {
+                                    if (g.pgn.isNotBlank()) {
+                                        TextButton(
+                                            onClick = { visiblePgnIndex = if (visiblePgnIndex == index) -1 else index },
+                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                                        ) {
+                                            Text(if (visiblePgnIndex == index) "Ocultar PGN" else "Ver PGN", color = Gold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                    if (g.uciMoves.isNotEmpty()) {
+                                        TextButton(
+                                            onClick = { onReplay(g) },
+                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 4.dp, vertical = 0.dp)
+                                        ) {
+                                            Text("Reproducir", color = Gold, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (visiblePgnIndex == index && g.pgn.isNotBlank()) {
                             Text(
-                                when (g.won) { true -> "Victoria"; false -> "Derrota"; null -> "Empate" },
-                                color = when (g.won) { true -> Green; false -> Red; null -> Muted },
-                                fontSize = 10.sp, fontWeight = FontWeight.Bold
+                                g.pgn,
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                                color = Muted,
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp
                             )
                         }
                     }

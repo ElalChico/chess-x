@@ -117,11 +117,17 @@ data class GameEndMessage(
         .put("reason", reason).put("message", message).toString()
 }
 
-/** Petición de nueva partida al terminar: "same" | "random" | "lobby". */
-data class RematchMessage(val mode: String, val byName: String) : BtMessage {
+/** Petición de nueva partida al terminar: "same" | "random" | "custom" | "lobby". */
+data class RematchMessage(
+    val mode: String,
+    val byName: String,
+    val timeMs: Long = -1,      // -1 = usar el tiempo actual
+    val incrementMs: Long = -1  // -1 = usar el incremento actual
+) : BtMessage {
     override val type = "REMATCH"
     override fun toJsonLine(): String = JSONObject()
-        .put("v", 2).put("type", type).put("mode", mode).put("by", byName).toString()
+        .put("v", 2).put("type", type).put("mode", mode).put("by", byName)
+        .put("timeMs", timeMs).put("incrementMs", incrementMs).toString()
 }
 
 /** El anfitrión arranca un torneo de N partidas con colores alternos. */
@@ -221,7 +227,12 @@ object MessageParser {
                 )
                 "PING" -> PingMessage(o.optLong("ts"))
                 "PONG" -> PongMessage(o.optLong("ts"))
-                "REMATCH" -> RematchMessage(o.optString("mode").take(8), o.optString("by").take(32))
+                "REMATCH" -> RematchMessage(
+                        o.optString("mode").take(8),
+                        o.optString("by").take(32),
+                        o.optLong("timeMs", -1),
+                        o.optLong("incrementMs", -1)
+                    )
                 "TOURNAMENT" -> TournamentStartMessage(
                     o.optInt("games").coerceIn(1, 20),
                     o.optLong("timeMs").coerceAtLeast(0),

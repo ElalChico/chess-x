@@ -42,7 +42,8 @@ object GameHistoryStore {
                         finalFen = o.optString("fen", ""),
                         playerName = o.optString("me", "Jugador"),
                         uciMoves = ucis,
-                        moveClocks = times
+                        moveClocks = times,
+                        opponentPhotoBase64 = o.optString("oppPhoto", "").takeIf { it.isNotBlank() }
                     )
                 )
             }
@@ -55,6 +56,19 @@ object GameHistoryStore {
         val sa = o.optJSONArray("san")
         if (sa != null) for (j in 0 until sa.length()) san.add(sa.optString(j, ""))
         return san
+    }
+
+    /**
+     * Checks if a game record is a duplicate of an existing one.
+     * Duplicate criteria: same opponent + same date (minute precision) + same result + same move count.
+     */
+    private fun isDuplicate(existing: List<GameRecord>, newRecord: GameRecord): Boolean {
+        return existing.any { rec ->
+            rec.opponent == newRecord.opponent &&
+            rec.result == newRecord.result &&
+            rec.movesSan.size == newRecord.movesSan.size &&
+            Math.abs(rec.dateMs - newRecord.dateMs) < 60_000 // misma minuto
+        }
     }
 
     fun remove(context: Context, id: String) {
@@ -85,6 +99,7 @@ object GameHistoryStore {
             o.put("san", JSONArray(r.movesSan))
             o.put("uci", JSONArray(r.uciMoves))
             o.put("clocks", JSONArray(r.moveClocks))
+            if (r.opponentPhotoBase64 != null) o.put("oppPhoto", r.opponentPhotoBase64)
             arr.put(o)
         }
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -94,8 +109,11 @@ object GameHistoryStore {
     fun append(context: Context, record: GameRecord) {
         try {
             val all = load(context).toMutableList()
-            all.add(0, record)
-            writeAll(context, all)
+            // Check for duplicates before adding
+            if (!isDuplicate(all, record)) {
+                all.add(0, record)
+                writeAll(context, all)
+            }
         } catch (_: Exception) { }
     }
 }

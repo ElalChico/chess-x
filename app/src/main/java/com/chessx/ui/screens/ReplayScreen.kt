@@ -1,5 +1,8 @@
 package com.chessx.ui.screens
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,6 +26,8 @@ import com.chessx.data.GameRecord
 import com.chessx.data.formatClock
 import com.chessx.ui.components.BoardSelection
 import com.chessx.ui.components.ChessBoard
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private val Bg2 = Color(0xFF0B0D10)
 private val Card3 = Color(0xFF171D25)
@@ -34,10 +39,13 @@ private val Green3 = Color(0xFF3DDC97)
 
 /**
  * Replay of a finished game from its PGN data: names, colors and per-move clocks.
+ * Includes auto-play with configurable speed (1x/2x/3x).
  */
 @Composable
-fun ReplayScreen(record: GameRecord, onBack: () -> Unit) {
+fun ReplayScreen(record: GameRecord, showCoordinates: Boolean = true, onBack: () -> Unit) {
     var idx by remember { mutableIntStateOf(0) }
+    var autoPlay by remember { mutableStateOf(false) }
+    var playSpeed by remember { mutableStateOf(1.0) } // 1x, 2x, 3x
     val total = record.uciMoves.size
     val snapshot: BoardSnapshot = remember(idx) {
         val engine = ChessEngine()
@@ -62,6 +70,22 @@ fun ReplayScreen(record: GameRecord, onBack: () -> Unit) {
     val localClock = if (localIsWhite) whiteClock else blackClock
     val remoteClock = if (localIsWhite) blackClock else whiteClock
     val san = record.movesSan.getOrNull(idx - 1)
+
+    // Auto-play logic
+    val scope = rememberCoroutineScope()
+    LaunchedEffect(autoPlay, idx, playSpeed) {
+        if (autoPlay && idx < total) {
+            val delayMs = when (playSpeed) {
+                2.0 -> 400L
+                3.0 -> 200L
+                else -> 800L
+            }
+            delay(delayMs)
+            if (autoPlay) idx++
+        } else if (autoPlay && idx >= total) {
+            autoPlay = false
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().background(Bg2).padding(horizontal = 14.dp, vertical = 12.dp),
@@ -90,24 +114,87 @@ fun ReplayScreen(record: GameRecord, onBack: () -> Unit) {
                 perspective = if (localIsWhite) ChessColor.WHITE else ChessColor.BLACK,
                 selection = BoardSelection(null),
                 onSquareTap = {},
-                modifier = Modifier.size(boardSize)
+                modifier = Modifier.size(boardSize),
+                showCoordinates = showCoordinates
             )
         }
         HudBar(localName, true, localClock, record)
+        
+        // Auto-play controls
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            BarBtn("Inicio") { idx = 0 }
-            BarBtn("< Atrás", enabled = idx > 0) { if (idx > 0) idx-- }
+            // Play/Pause/Stop buttons
+            if (!autoPlay) {
+                BarBtn("▶ Reproducir", enabled = idx < total) {
+                    autoPlay = true
+                }
+            } else {
+                BarBtn("⏸ Pausar") {
+                    autoPlay = false
+                }
+            }
+            if (idx > 0 || autoPlay) {
+                BarBtn("⏹ Detener") {
+                    autoPlay = false
+                    idx = 0
+                }
+            }
+            
+            // Speed selector
+            Spacer(Modifier.width(8.dp))
+            Text("Velocidad:", color = Muted3, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf(1.0, 2.0, 3.0).forEach { speed ->
+                    val selected = playSpeed == speed
+                    if (selected) {
+                        Box(
+                            modifier = Modifier
+                                .background(Gold3, RoundedCornerShape(12.dp))
+                                .border(1.dp, Gold3, RoundedCornerShape(12.dp))
+                                .clickable { playSpeed = speed }
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("${speed.toInt()}x", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                        }
+                    } else {
+                        BarBtn("${speed.toInt()}x") { playSpeed = speed }
+                    }
+                }
+            }
+        }
+        
+        // Navigation controls
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BarBtn("⏮ Inicio") { autoPlay = false; idx = 0 }
+            BarBtn("⏪ Atrás", enabled = idx > 0) { autoPlay = false; if (idx > 0) idx-- }
             Text(
                 "$idx/$total" + (san?.let { " · $it" } ?: ""),
                 fontSize = 12.sp, color = Muted3, modifier = Modifier.weight(1f), textAlign = TextAlign.Center
             )
-            BarBtn("Adelante >", enabled = idx < total) { if (idx < total) idx++ }
-            BarBtn("Final") { idx = total }
+            BarBtn("Adelante ⏩", enabled = idx < total) { autoPlay = false; if (idx < total) idx++ }
+            BarBtn("Final ⏭") { autoPlay = false; idx = total }
         }
+    }
+}
+
+@Composable
+private fun BarBtn(label: String, enabled: Boolean = true, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .background(if (enabled) Color(0xFF1A212B) else Color(0xFF14181F), RoundedCornerShape(12.dp))
+            .border(1.dp, Line3, RoundedCornerShape(12.dp))
+            .clickable(enabled = enabled) { onClick() }.padding(horizontal = 12.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = if (enabled) Text13 else Muted3)
     }
 }
 
