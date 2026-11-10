@@ -1,11 +1,11 @@
 package com.chessx
 
 import android.app.Activity
+import android.os.Bundle
 import android.bluetooth.BluetoothAdapter
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -146,172 +146,91 @@ class MainActivity : ComponentActivity() {
         super.onDestroy()
         try { vm.onClearedCleanup() } catch (_: Exception) {}
     }
-}
 
-@Composable
-fun ChessApp(
-    vm: GameViewModel,
-    prefs: AppPreferences,
-    activity: Activity,
-    permissionLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>,
-    discoverableLauncher: androidx.activity.result.ActivityResultLauncher<Intent>
-) {
-    var screen by remember { mutableStateOf(if (prefs.profileConfigured) Screen.HOME else Screen.PROFILE) }
-    var isHostMode by remember { mutableStateOf(false) }
-    var profileNextScreen by remember { mutableStateOf(Screen.HOME) }
-    var connectReturnScreen by remember { mutableStateOf(Screen.HOME) }
-    var fullscreen by remember { mutableStateOf(false) }
-    var history by remember { mutableStateOf(GameHistoryStore.load(activity)) }
-    var replayRecord by remember { mutableStateOf<GameRecord?>(null) }
-    var showRivalProfile by remember { mutableStateOf(false) }
-    val updateScope = remember { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
+    @Composable
+    fun ChessApp(
+        vm: GameViewModel,
+        prefs: AppPreferences,
+        activity: Activity,
+        permissionLauncher: androidx.activity.result.ActivityResultLauncher<Array<String>>,
+        discoverableLauncher: androidx.activity.result.ActivityResultLauncher<Intent>
+    ) {
+        var screen by remember { mutableStateOf(if (prefs.profileConfigured) Screen.HOME else Screen.PROFILE) }
+        var isHostMode by remember { mutableStateOf(false) }
+        var profileNextScreen by remember { mutableStateOf(Screen.HOME) }
+        var connectReturnScreen by remember { mutableStateOf(Screen.HOME) }
+        var fullscreen by remember { mutableStateOf(false) }
+        var history by remember { mutableStateOf(GameHistoryStore.load(activity)) }
+        var replayRecord by remember { mutableStateOf<GameRecord?>(null) }
+        var showRivalProfile by remember { mutableStateOf(false) }
+        val updateScope = remember { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
 
-    LaunchedEffect(screen) { if (screen == Screen.PROFILE) history = GameHistoryStore.load(activity) }
+        LaunchedEffect(screen) { if (screen == Screen.PROFILE) history = GameHistoryStore.load(activity) }
 
-    val ui by vm.ui.collectAsState()
-    val btState by vm.bluetooth.state.collectAsState()
-    val devices by vm.bluetooth.devices.collectAsState()
-    val btError by vm.bluetooth.lastError.collectAsState()
-    val remoteProfile by vm.remoteProfile.collectAsState()
-    val isEn = prefs.language == AppLanguage.EN
-    val startHostListening: () -> Unit = {
-        vm.bluetooth.setVisibleDeviceName("${prefs.profileName} · Anfitrión")
-        try {
-            discoverableLauncher.launch(discoverableIntent())
-        } catch (_: Exception) {
-            try { vm.bluetooth.hostListen() } catch (_: Exception) {}
-        }
-    }
-    val startGuestScanning: () -> Unit = {
-        vm.bluetooth.setVisibleDeviceName("${prefs.profileName} · Invitado")
-        vm.bluetooth.startDiscovery()
-    }
-    val continueFromProfile: () -> Unit = {
-        prefs.completeProfile()
-        when (profileNextScreen) {
-            Screen.ROOM -> screen = Screen.ROOM
-            Screen.CONNECT -> {
-                screen = Screen.CONNECT
-                if (isHostMode) startHostListening() else startGuestScanning()
+        val ui by vm.ui.collectAsState()
+        val btState by vm.bluetooth.state.collectAsState()
+        val devices by vm.bluetooth.devices.collectAsState()
+        val btError by vm.bluetooth.lastError.collectAsState()
+        val remoteProfile by vm.remoteProfile.collectAsState()
+        val isEn = prefs.language == AppLanguage.EN
+        val startHostListening: () -> Unit = {
+            vm.bluetooth.setVisibleDeviceName("${prefs.profileName} · Anfitrión")
+            try {
+                discoverableLauncher.launch(discoverableIntent())
+            } catch (_: Exception) {
+                try { vm.bluetooth.hostListen() } catch (_: Exception) {}
             }
-            Screen.GAME -> screen = Screen.GAME
-            Screen.SETTINGS -> screen = Screen.SETTINGS
-            else -> screen = Screen.HOME
         }
-        profileNextScreen = Screen.HOME
-    }
-
-    LaunchedEffect(prefs.soundEnabled, prefs.soundVolume) {
-        try { vm.sound.setEnabled(prefs.soundEnabled); vm.sound.setVolume(prefs.soundVolume) } catch (_: Exception) {}
-    }
-    LaunchedEffect(prefs.soundPack) {
-        try { vm.sound.setPack(prefs.soundPack) } catch (_: Exception) {}
-    }
-    LaunchedEffect(prefs.profileName) { vm.setLocalName(prefs.profileName) }
-
-    LaunchedEffect(fullscreen) {
-        try {
-            val controller = androidx.core.view.WindowCompat.getInsetsController(activity.window, activity.window.decorView)
-            if (fullscreen) {
-                controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-                controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            } else controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-        } catch (_: Exception) {}
-    }
-
-    LaunchedEffect(btState) {
-        if (btState == BtState.CONNECTED) {
-            vm.sendHello()
-            vm.sendProfile()
-            if (ui.lobby.isHost) vm.sendLobbyConfig()
-            if (screen == Screen.CONNECT) screen = Screen.ROOM
+        val startGuestScanning: () -> Unit = {
+            vm.bluetooth.setVisibleDeviceName("${prefs.profileName} · Invitado")
+            vm.bluetooth.startDiscovery()
         }
-    }
-    LaunchedEffect(ui.lobby.gameStarted) {
-        if (ui.lobby.gameStarted && (screen == Screen.PROFILE || screen == Screen.ROOM)) screen = Screen.GAME
-    }
-
-    // Auto-check updates on app start (silent, only shows dialog if update available)
-    val updateManager = remember { UpdateManager.getInstance(activity) }
-    val updateState by updateManager.updateState.collectAsStateWithLifecycle()
-    var autoUpdateChecked by remember { mutableStateOf(false) }
-    var showUpdateDialog by remember { mutableStateOf(false) }
-    var pendingUpdateResult by remember { mutableStateOf<com.chessx.data.UpdateCheckResult?>(null) }
-
-    LaunchedEffect(Unit) {
-        if (!autoUpdateChecked) {
-            autoUpdateChecked = true
-            updateManager.checkForUpdate()
-        }
-    }
-
-    LaunchedEffect(updateState) {
-        when (updateState) {
-            is UpdateState.UpdateAvailable -> {
-                val result = (updateState as UpdateState.UpdateAvailable).result
-                if (autoUpdateChecked && !showUpdateDialog) {
-                    pendingUpdateResult = result
-                    showUpdateDialog = true
+        val continueFromProfile: () -> Unit = {
+            prefs.completeProfile()
+            when (profileNextScreen) {
+                Screen.ROOM -> screen = Screen.ROOM
+                Screen.CONNECT -> {
+                    screen = Screen.CONNECT
+                    if (isHostMode) startHostListening() else startGuestScanning()
                 }
+                Screen.GAME -> screen = Screen.GAME
+                Screen.SETTINGS -> screen = Screen.SETTINGS
+                else -> screen = Screen.HOME
             }
-            is UpdateState.UpToDate, is UpdateState.Error -> {
-                // Silencioso: no mostrar nada al inicio, solo en Ajustes si se consulta manual
-            }
-            else -> { /* Checking, Downloading, Downloaded, Installing, Installed, Idle */ }
-        }
-    }
-
-    Column(Modifier.fillMaxSize().background(Color(0xFF0B0D10))) {
-        // Diálogo de actualización automática al inicio
-        if (showUpdateDialog && pendingUpdateResult != null) {
-            val result = pendingUpdateResult!!
-            Dialog(
-                onDismissRequest = { showUpdateDialog = false },
-                properties = DialogProperties(usePlatformDefaultWidth = false)
-            ) {
-                androidx.compose.material3.Card(
-                    modifier = Modifier.fillMaxWidth().padding(24.dp),
-                    colors = androidx.compose.material3.CardDefaults.cardColors(
-                        containerColor = Color(0xFF12141A),
-                        contentColor = Color(0xFFEEF1F5)
-                    ),
-                    shape = RoundedCornerShape(16.dp),
-                    elevation = androidx.compose.material3.CardDefaults.cardElevation(defaultElevation = 8.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("Actualización disponible", color = Color(0xFFEEF1F5), fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-                        Text("Versión X.${result.remoteVersion.versionCode} disponible", color = Color(0xFFE2B94E), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text(result.releaseNotes, color = Color(0xFF8B96A5), fontSize = 12.sp, maxLines = 4)
-                        Text("Tus partidas, perfil y ajustes se conservan (mismo keystore)", color = Color(0xFF3DDC97), fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            TextButton(
-                                onClick = { showUpdateDialog = false },
-                                modifier = Modifier.weight(1f),
-                                contentPadding = PaddingValues(vertical = 12.dp)
-                            ) { Text("Luego", color = Color(0xFF8B96A5), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
-                            Button(
-                                onClick = {
-                                    showUpdateDialog = false
-                                    updateScope.launch { updateManager.downloadAndInstall(result.apkUrl!!) { _ -> } }
-                                },
-                                modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3DDC97), contentColor = Color(0xFF0B0D10)),
-                                contentPadding = PaddingValues(vertical = 12.dp)
-                            ) { Text("Actualizar ahora", fontWeight = FontWeight.ExtraBold, fontSize = 13.sp) }
-                        }
-                    }
-                }
-            }
+            profileNextScreen = Screen.HOME
         }
 
-        Box(Modifier.weight(1f)) {
+        LaunchedEffect(prefs.soundEnabled, prefs.soundVolume) {
+            try { vm.sound.setEnabled(prefs.soundEnabled); vm.sound.setVolume(prefs.soundVolume) } catch (_: Exception) {}
+        }
+        LaunchedEffect(prefs.soundPack) {
+            try { vm.sound.setPack(prefs.soundPack) } catch (_: Exception) {}
+        }
+        LaunchedEffect(prefs.profileName) { vm.setLocalName(prefs.profileName) }
+
+        LaunchedEffect(fullscreen) {
+            try {
+                val controller = androidx.core.view.WindowCompat.getInsetsController(activity.window, activity.window.decorView)
+                if (fullscreen) {
+                    controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+                    controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                } else controller.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            } catch (_: Exception) {}
+        }
+
+        LaunchedEffect(btState) {
+            if (btState == BtState.CONNECTED) {
+                vm.sendHello()
+                vm.sendProfile()
+                if (ui.lobby.isHost) vm.sendLobbyConfig()
+                if (screen == Screen.CONNECT) screen = Screen.ROOM
+            }
+        }
+        LaunchedEffect(ui.lobby.gameStarted) {
+            if (ui.lobby.gameStarted && (screen == Screen.PROFILE || screen == Screen.ROOM)) screen = Screen.GAME
+        }
+
+        Column(Modifier.fillMaxSize().background(Color(0xFF0B0D10))) {
             when (screen) {
                 Screen.HOME -> HomeScreen(
                     inSession = btState == BtState.CONNECTED,
@@ -368,8 +287,7 @@ fun ChessApp(
 
                 Screen.PROFILE -> LobbyScreen(
                     lobby = ui.lobby, localName = ui.localName, remoteName = ui.remoteName,
-                    photoBase64 = prefs.profilePhotoBase64,
-                    history = history,
+                    photoBase64 = prefs.profilePhotoBase64, history = history,
                     remoteProfile = remoteProfile,
                     connected = btState == BtState.CONNECTED,
                     onViewRivalProfile = { showRivalProfile = true },
