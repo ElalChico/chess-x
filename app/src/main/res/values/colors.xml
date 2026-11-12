@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <color name="black">#FF0B0D10</color>
     <color name="surface_dark">#FF13171D</color>
     <color name="surface_mid">#FF171D25</color>
@@ -6,4 +6,6 @@
     <color name="green">#FF3DDC97</color>
     <color name="board_light">#FFF0D9B5</color>
     <color name="board_dark">#FFB58863</color>
+    <color name="brand_bg">#FF101820</color>
 </resources>
+
