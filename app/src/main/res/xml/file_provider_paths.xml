@@ -1,8 +1,9 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Directorio de descargas de la app (getExternalFilesDir) -->
-    <files-path name="downloads" path="Download/" />
-    <external-files-path name="downloads" path="Download/" />
-    <cache-path name="downloads" path="Download/" />
-    <external-cache-path name="downloads" path="Download/" />
+    <!-- Internal app cache (always covers cacheDir) -->
+    <cache-path name="cache" path="." />
+    <external-cache-path name="external-cache" path="." />
+    <!-- Internal and external app files -->
+    <files-path name="files" path="." />
+    <external-files-path name="external-files" path="." />
 </paths>

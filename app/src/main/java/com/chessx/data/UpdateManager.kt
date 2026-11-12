@@ -200,20 +200,26 @@ class UpdateManager private constructor(context: Context) {
     /**
      * Borra APKs de actualización antiguos/fallidos para no acumular basura.
      * Se llama al arrancar la app y también antes de cada descarga.
+     * Limpia tanto la caché interna como el directorio externo de descargas.
      */
     fun cleanupStaleUpdates(maxAgeMs: Long = 24 * 60 * 60 * 1000L) {
-        try {
-            val dir = ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return
-            val now = System.currentTimeMillis()
-            dir.listFiles { f ->
-                f.name.startsWith("chess-x-update") && f.name.endsWith(".apk")
-            }?.forEach { f ->
-                // Borra siempre los muy antiguos; los fallidos se re-crean con nombre único
-                if (now - f.lastModified() > maxAgeMs || f.length() == 0L) {
-                    try { f.delete() } catch (_: Exception) { }
+        val dirs = listOf(
+            ctx.cacheDir,
+            ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        )
+        val now = System.currentTimeMillis()
+        for (dir in dirs) {
+            try {
+                dir?.listFiles { f ->
+                    f.name.startsWith("chess-x-update") && f.name.endsWith(".apk")
+                }?.forEach { f ->
+                    // Borra siempre los muy antiguos; los fallidos se re-crean con nombre único
+                    if (now - f.lastModified() > maxAgeMs || f.length() == 0L) {
+                        try { f.delete() } catch (_: Exception) { }
+                    }
                 }
-            }
-        } catch (_: Exception) { }
+            } catch (_: Exception) { }
+        }
     }
 
     /**
@@ -226,9 +232,10 @@ class UpdateManager private constructor(context: Context) {
     ): Result<Unit> {
         // Limpieza previa: borra descargas fallidas/viejas para no acumular basura
         cleanupStaleUpdates(0L)
-        // Nombre único con marca de tiempo: evita colisiones con descargas fallidas
+        // Caché interna de la app: el FileProvider siempre cubre cacheDir.
+        // Nombre único con marca de tiempo: evita colisiones con descargas fallidas.
         val file = File(
-            ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+            ctx.cacheDir,
             "chess-x-update-${System.currentTimeMillis()}.apk"
         )
 
