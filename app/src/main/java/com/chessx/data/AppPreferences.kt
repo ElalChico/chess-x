@@ -35,10 +35,26 @@ enum class BoardTheme(
     )
 }
 
-enum class PieceSet(val labelEs: String, val labelEn: String) {
-    LICHESS("Lichess · Vector", "Lichess · Vector"),
-    CHESS_COM("Moderno", "Modern"),
-    OPEN_SOURCE("Trazo abierto", "Open line");
+/**
+ * Conjuntos de piezas disponibles.
+ *
+ * Todos son los juegos oficiales de Lichess (creados por usuarios y liberados
+ * como open source), convertidos a VectorDrawable de Android.
+ * Cada conjunto son 12 vectores: `ps_<clave>_<w|b><pieza>`.
+ */
+enum class PieceSet(val labelEs: String, val labelEn: String, val resKey: String) {
+    LICHESS("Clásico", "Classic", "cburnett"),
+    ALPHA("Alpha", "Alpha", "alpha"),
+    ANARCANDY("Anarcandy", "Anarcandy", "anarcandy"),
+    COMPANION("Cómplice", "Companion", "companion"),
+    HORSEY("Horsey", "Horsey", "horsey"),
+    LEIPZIG("Leipzig", "Leipzig", "leipzig"),
+    MERIDA("Merida", "Merida", "merida"),
+    PIXEL("Pixel", "Pixel", "pixel"),
+    RIOHACHA("Riohacha", "Riohacha", "riohacha"),
+    STAUNTY("Staunty", "Staunty", "staunty"),
+    TATIANA("Tatiana", "Tatiana", "tatiana"),
+    ICPIECES("Icpieces", "Icpieces", "icpieces");
 
     companion object {
         val DEFAULT = LICHESS
@@ -118,6 +134,16 @@ class AppPreferences(context: Context) {
     private var _profilePhotoBase64 by mutableStateOf(p.getString("profile_photo", "") ?: "")
     val profilePhotoBase64: String get() = _profilePhotoBase64
 
+    /** Unique BT identifier for this app install (persistent across reinstalls with same keystore). */
+    private var _btIdentifier by mutableStateOf(p.getString("bt_identifier", null) ?: generateBtId())
+    val btIdentifier: String get() = _btIdentifier
+
+    private fun generateBtId(): String {
+        val id = "CHX-${java.util.UUID.randomUUID().toString().substring(0, 8).uppercase()}"
+        p.edit().putString("bt_identifier", id).apply()
+        return id
+    }
+
     private var _defaultTimeMs by mutableLongStateOf(p.getLong("time_ms", 300_000L))
     val defaultTimeMs: Long get() = _defaultTimeMs
 
@@ -145,7 +171,8 @@ class AppPreferences(context: Context) {
             .putBoolean("share_history", v.shareHistory)
             .putBoolean("share_pgn", v.sharePgn).apply()
     }
-    fun setProfileName(v: String) { val n = v.trim().ifBlank { "Jugador" }.take(20); _profileName = n; p.edit().putString("profile_name", n).apply() }
+    /** El nombre puede quedar vacio: el usuario lo edita libremente en el perfil. */
+    fun setProfileName(v: String) { val n = v.trim().take(20); _profileName = n; p.edit().putString("profile_name", n).apply() }
     fun completeProfile() { _profileConfigured = true; p.edit().putBoolean("profile_configured", true).apply() }
     fun setProfilePhotoBase64(v: String) { _profilePhotoBase64 = v.take(60_000); p.edit().putString("profile_photo", _profilePhotoBase64).apply() }
     fun setDefaultTime(timeMs: Long, incMs: Long) {

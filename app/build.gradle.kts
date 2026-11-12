@@ -21,8 +21,8 @@ android {
         applicationId = "com.chessx"
         minSdk = 26
         targetSdk = 34
-        versionCode = 54
-        versionName = "X.54"
+        versionCode = 55
+        versionName = "X.55"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

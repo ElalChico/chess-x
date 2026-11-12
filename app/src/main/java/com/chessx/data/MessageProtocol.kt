@@ -9,7 +9,7 @@ sealed interface BtMessage {
     fun toJsonLine(): String
 }
 
-object ProtocolVersion { const val V = 2 }
+object ProtocolVersion { const val V = 3 }
 
 data class HelloMessage(
     val playerName: String,
@@ -163,6 +163,41 @@ data class ProfileMessage(
         .put("games", gamesJson).toString()
 }
 
+/**
+ * Reanudacion de una partida interrumpida por perdida de Bluetooth.
+ * El anfitrion manda el estado COMPLETO: posicion (con el turno dentro del FEN),
+ * movimientos, relojes y la ultima jugada. El invitado reconstruye su partida
+ * con estos datos y continua respetando el turno de cada uno.
+ */
+data class ResumeGameMessage(
+    val fen: String,
+    val uciJson: String,
+    val sanJson: String,
+    val clocksJson: String,
+    val whiteMs: Long,
+    val blackMs: Long,
+    val timeMs: Long,
+    val incrementMs: Long,
+    val hostColor: String,
+    val hostName: String,
+    val guestName: String,
+    val lastFrom: Int,
+    val lastTo: Int,
+    val timestamp: Long
+) : BtMessage {
+    override val type = "RESUME"
+    override fun toJsonLine(): String = JSONObject()
+        .put("v", ProtocolVersion.V).put("type", type)
+        .put("fen", fen)
+        .put("uci", uciJson).put("san", sanJson).put("clocks", clocksJson)
+        .put("wms", whiteMs).put("bms", blackMs)
+        .put("tc", timeMs).put("inc", incrementMs)
+        .put("hostColor", hostColor)
+        .put("hostName", hostName.take(32)).put("guestName", guestName.take(32))
+        .put("lf", lastFrom).put("lt", lastTo)
+        .put("ts", timestamp).toString()
+}
+
 data class PingMessage(val ts: Long) : BtMessage {
     override val type = "PING"
     override fun toJsonLine(): String = JSONObject().put("v", 2).put("type", type).put("ts", ts).toString()
@@ -240,6 +275,13 @@ object MessageParser {
                     o.optBoolean("hostColorWhite", true)
                 )
                 "ERROR" -> ErrorMessage(o.optString("code"), o.optString("text").take(256))
+                "RESUME" -> ResumeGameMessage(
+                    o.optString("fen"), o.optString("uci"), o.optString("san"), o.optString("clocks"),
+                    o.optLong("wms"), o.optLong("bms"), o.optLong("tc"), o.optLong("inc"),
+                    o.optString("hostColor").ifBlank { "white" },
+                    o.optString("hostName").take(32), o.optString("guestName").take(32),
+                    o.optInt("lf", -1), o.optInt("lt", -1), o.optLong("ts")
+                )
                 else -> null
             }
         } catch (_: Exception) {

@@ -16,17 +16,20 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.chessx.ui.theme.Bg
+import com.chessx.ui.theme.Card
+import com.chessx.ui.theme.Gold
+import com.chessx.ui.theme.Green
+import com.chessx.ui.theme.Line
+import com.chessx.ui.theme.Muted
+import com.chessx.ui.theme.Text1
 
-private val Bg = Color(0xFF0B0D10)
-private val Card = Color(0xFF12141A)
-private val Line = Color(0xFF2A2E36)
-private val Text1 = Color(0xFFEEF1F5)
-private val Muted = Color(0xFF8B96A5)
-private val Gold = Color(0xFFE2B94E)
-private val Green = Color(0xFF3DDC97)
+/** Repositorio oficial de CHESS-X. */
+const val GITHUB_URL = "https://github.com/ElalChico"
 
 @Composable
 fun HomeScreen(
@@ -39,6 +42,10 @@ fun HomeScreen(
     onCreate: () -> Unit,
     onSearch: () -> Unit
 ) {
+    val uriHandler = LocalUriHandler.current
+    val openGitHub: () -> Unit = {
+        try { uriHandler.openUri(GITHUB_URL) } catch (_: Exception) {}
+    }
     val avatar = remember(profilePhotoBase64) {
         try {
             profilePhotoBase64.substringAfter("base64,", profilePhotoBase64).takeIf { it.isNotBlank() }?.let {
@@ -59,9 +66,16 @@ fun HomeScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
-                Text("CHESS-X", color = Text1, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
-                Text("Ajedrez cerca, partida a partida", color = Muted, fontSize = 11.sp)
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(com.chessx.R.drawable.brand_chessx),
+                    contentDescription = "CHESS-X",
+                    modifier = Modifier.size(36.dp)
+                )
+                Column {
+                    Text("CHESS-X", color = Text1, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp)
+                    Text("Ajedrez cerca, partida a partida", color = Muted, fontSize = 11.sp)
+                }
             }
             Surface(
                 shape = RoundedCornerShape(50),
@@ -145,6 +159,33 @@ fun HomeScreen(
                     )
                 }
                 Text(if (inSession) "●" else clockSummary, color = if (inSession) Green else Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        // Firma del autor + acceso al repositorio
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                Text("Creada por Elal Chico", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                Text("CHESS-X · © Elal Chico", color = Muted.copy(alpha = 0.6f), fontSize = 9.5.sp)
+            }
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = Color(0xFF151C25),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2F3947)),
+                modifier = Modifier.clickable { openGitHub() }
+            ) {
+                Row(
+                    Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text("⌘", color = Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text("GitHub", color = Text1, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }

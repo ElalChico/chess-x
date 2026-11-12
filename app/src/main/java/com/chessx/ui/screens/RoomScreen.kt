@@ -57,6 +57,9 @@ fun RoomScreen(
     onConnect: () -> Unit,
     onStartGame: () -> Unit,
     onStartTournament: (Int) -> Unit = {},
+    /** Partida suspendida pendiente de retomar (historial especial). */
+    suspendedGame: com.chessx.data.SuspendedGame? = null,
+    onResumeGame: (com.chessx.data.SuspendedGame) -> Unit = {},
     onBack: () -> Unit
 ) {
     val isHost = lobby.isHost
@@ -264,11 +267,13 @@ fun RoomScreen(
         if (isHost) {
             val actionLabel = when {
                 !lobby.connected -> "Conectar rival"
+                suspendedGame != null -> "Reanudar partida"
                 tournamentMode -> "Iniciar torneo"
                 else -> "Iniciar partida"
             }
             val actionDetail = when {
                 !lobby.connected -> "Primero configura el reloj y luego conecta al rival"
+                suspendedGame != null -> "Partida suspendida · ${suspendedGame.movesCount} jugadas · se continua con el turno guardado"
                 !rivalOk -> "Bluetooth conectado · sincronizando perfil del rival"
                 else -> "Ambos móviles comenzarán con una cuenta regresiva"
             }
@@ -282,7 +287,11 @@ fun RoomScreen(
                 Button(
                     onClick = {
                         if (lobby.connected) {
-                            if (tournamentMode) onStartTournament(tournamentGames) else onStartGame()
+                            when {
+                                suspendedGame != null -> suspendedGame.let(onResumeGame)
+                                tournamentMode -> onStartTournament(tournamentGames)
+                                else -> onStartGame()
+                            }
                         } else {
                             onConnect()
                         }
@@ -450,7 +459,11 @@ private fun ColorCard(
             contentAlignment = Alignment.Center
         ) {
             androidx.compose.foundation.Image(
-                painter = androidx.compose.ui.res.painterResource(id = if (white) R.drawable.piece_wp else R.drawable.piece_bp),
+                painter = androidx.compose.ui.res.painterResource(
+                    id = com.chessx.ui.components.pieceResource(
+                        com.chessx.core.Piece(com.chessx.core.PieceType.PAWN, if (white) com.chessx.core.Color.WHITE else com.chessx.core.Color.BLACK)
+                    )
+                ),
                 contentDescription = title,
                 modifier = Modifier.size(44.dp)
             )

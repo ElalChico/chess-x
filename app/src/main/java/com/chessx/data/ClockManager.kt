@@ -97,6 +97,17 @@ class ClockManager(
         }
     }
 
+    /**
+     * Restaura el reloj a un estado concreto (tras reconectar o reanudar).
+     * No toca initialMs ni el incremento: solo fija el tiempo restante de cada
+     * bando y de quien es el turno, para que ambos mobiles coincidan.
+     */
+    fun restore(whiteMs: Long, blackMs: Long, sideToMove: Color) {
+        _state.value = ClockState(whiteMs, blackMs, sideToMove, false, false)
+        lastTickWall = System.currentTimeMillis()
+        lastSyncToHost = lastTickWall
+    }
+
     fun stop() {
         running = false
         tickJob?.cancel()

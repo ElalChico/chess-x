@@ -49,7 +49,8 @@ data class DiscoveredDevice(
 
 class BluetoothClassicManager(
     private val context: Context,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    private val btIdentifier: String? = null
 ) {
     companion object {
         private const val TAG = "BtClassic"
@@ -153,14 +154,14 @@ class BluetoothClassicManager(
 
     private fun parseChessXInfo(name: String): Triple<Boolean, DeviceRole, String?> {
         val lower = name.lowercase()
-        // Check if it's our app by service record name or naming convention
-        val isChessX = lower.contains("chess") || lower.contains("chx")
+        // Check if it's our app by BT identifier prefix (CHX-) or legacy naming convention
+        val isChessX = lower.contains("chess") || lower.contains("chx") || name.startsWith("CHX-")
         
         var role = DeviceRole.UNKNOWN
         var username: String? = null
         
         if (isChessX) {
-            // Try to parse format: "CHESS-X · Anfitrión" or "CHESS-X · Invitado" or "CHESS-X · Username"
+            // Try to parse format: "CHX-ABC12345 · Anfitrión" or "CHESS-X · Anfitrión" or "CHESS-X · Username"
             if (lower.contains("anfitri")) role = DeviceRole.HOST
             else if (lower.contains("invitad")) role = DeviceRole.GUEST
             
@@ -179,6 +180,12 @@ class BluetoothClassicManager(
 
     fun isBluetoothOn(): Boolean = try { adapter()?.isEnabled == true } catch (_: SecurityException) { false }
     fun isAvailable(): Boolean = adapter() != null
+
+    /** Generates the full device name including BT identifier. */
+    private fun buildDeviceName(roleSuffix: String, username: String?): String {
+        val id = btIdentifier ?: "CHESS-X"
+        return "$id · $roleSuffix${username?.let { " · $it" } ?: ""}"
+    }
 
     fun setVisibleDeviceName(name: String): Boolean {
         return try {
@@ -200,7 +207,7 @@ class BluetoothClassicManager(
     }
 
     fun updateHostName(username: String?) {
-        hostName = "CHESS-X · ${username?.ifBlank { "Anfitrión" } ?: "Anfitrión"}"
+        hostName = buildDeviceName("Anfitrión", username)
         if (isHost && _state.value == BtState.WAITING_HOST) {
             setVisibleDeviceName(hostName)
         }

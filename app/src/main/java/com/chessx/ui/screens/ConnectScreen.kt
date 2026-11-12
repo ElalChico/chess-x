@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.*
@@ -53,6 +54,7 @@ fun ConnectScreen(
     onBack: () -> Unit,
     error: String?,
     myName: String = "Jugador",
+    myBtId: String? = null,
     remoteName: String = "",
     remoteProfile: RemoteProfile? = null,
     onViewRivalProfile: () -> Unit = {},
@@ -70,6 +72,17 @@ fun ConnectScreen(
                     color = Text1, fontSize = 11.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                 )
+            }
+            // Show BT identifier
+            myBtId?.let { id ->
+                Spacer(Modifier.width(8.dp))
+                Surface(shape = RoundedCornerShape(50), color = Color(0xFF1A1A14), border = androidx.compose.foundation.BorderStroke(1.dp, Gold.copy(alpha = 0.5f))) {
+                    Text(
+                        "ID: $id",
+                        color = Gold, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+                }
             }
         }
         Spacer(Modifier.height(2.dp))
@@ -123,43 +136,59 @@ fun ConnectScreen(
                         .padding(4.dp)
                 )
                 if (btState != BtState.CONNECTED) {
-                    Column(
+                    val ov = overlayData(btState)
+                    Box(
                         modifier = Modifier
                             .fillMaxSize()
-                            .background(Color(0xAA0B0D10), RoundedCornerShape(16.dp))
+                            .background(Color(0xCC0B0D10), RoundedCornerShape(16.dp))
                             .clickable { },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                        contentAlignment = Alignment.Center
                     ) {
-                        when (btState) {
-                            BtState.WAITING_HOST -> {
-                                Text("⌛", fontSize = 48.sp)
-                                Text("Esperando conexión…", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
-                                Text("El invitado debe pulsar «Unirse a partida» y seleccionar este dispositivo", color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
+                        Column(
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp)
+                                .background(Color(0xFF10151C), RoundedCornerShape(20.dp))
+                                .border(
+                                    1.dp,
+                                    if (ov.error) Color(0xFF4A2626) else Color(0xFF2A3341),
+                                    RoundedCornerShape(20.dp)
+                                )
+                                .padding(horizontal = 14.dp, vertical = 14.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(7.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .background(Color(0xFF1A1A14), CircleShape)
+                                    .border(1.5.dp, if (ov.error) Red else Gold, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(ov.emoji, fontSize = 20.sp)
                             }
-                            BtState.SCANNING -> {
-                                Text("🔍", fontSize = 48.sp)
-                                Text("Buscando anfitrión…", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
-                                Text("El anfitrión debe estar en «Crear partida» con Bluetooth visible", color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
-                            }
-                            BtState.CONNECTING -> {
-                                CircularProgressIndicator(color = Gold, modifier = Modifier.size(48.dp), strokeWidth = 4.dp)
-                                Text("Conectando…", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
-                            }
-                            BtState.DISCONNECTED -> {
-                                Text("⚠️", fontSize = 48.sp)
-                                Text("Conexión perdida", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Red)
-                                Text("Reintentando automáticamente (hasta 5 veces)…", color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
-                            }
-                            BtState.ERROR -> {
-                                Text("❌", fontSize = 48.sp)
-                                Text("Error de conexión", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Red)
-                                Text("Revisa permisos de Bluetooth y reintenta", color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
-                            }
-                            else -> {
-                                Text("📱", fontSize = 48.sp)
-                                Text("Sin rival conectado", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Gold)
-                                Text("Elige tu rol abajo para crear o unirte a una partida", color = Muted, fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(horizontal = 24.dp))
+                            Text(
+                                ov.title,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.ExtraBold,
+                                color = if (ov.error) Red else Gold,
+                                textAlign = TextAlign.Center
+                            )
+                            Text(
+                                ov.subtitle,
+                                color = Muted,
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp,
+                                textAlign = TextAlign.Center
+                            )
+                            if (!ov.error) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                    modifier = Modifier.padding(top = 1.dp)
+                                ) {
+                                    Box(Modifier.size(6.dp).background(Gold, CircleShape))
+                                    Text("Bluetooth activo", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                                }
                             }
                         }
                     }
@@ -320,6 +349,23 @@ fun ConnectScreen(
             }
         }
     }
+}
+
+/** Contenido del velo que se muestra sobre el tablero de vista previa. */
+private data class OverlayData(
+    val emoji: String,
+    val title: String,
+    val subtitle: String,
+    val error: Boolean = false
+)
+
+private fun overlayData(state: BtState): OverlayData = when (state) {
+    BtState.WAITING_HOST -> OverlayData("⌛", "Esperando conexión…", "El invitado debe pulsar «Unirse a partida» y seleccionar este dispositivo")
+    BtState.SCANNING -> OverlayData("🔍", "Buscando anfitrión…", "El anfitrión debe estar en «Crear partida» con Bluetooth visible")
+    BtState.CONNECTING -> OverlayData("🔗", "Conectando…", "Estableciendo enlace Bluetooth con el rival")
+    BtState.DISCONNECTED -> OverlayData("⚠️", "Conexión perdida", "Reintentando automáticamente (hasta 5 veces)…", error = true)
+    BtState.ERROR -> OverlayData("❌", "Error de conexión", "Revisa permisos de Bluetooth y reintenta", error = true)
+    else -> OverlayData("📱", "Sin rival conectado", "Elige tu rol abajo para crear o unirte a una partida")
 }
 
 // ---- Device Cards ----

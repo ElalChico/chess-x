@@ -1,5 +1,5 @@
 /*
- * CHESS-X · © Elal Chico
+ * CHESS-X Â· Â© Elal Chico
  * Tablero de ajedrez con estilos vectoriales, coordenadas y resaltados de juego.
  */
 
@@ -52,29 +52,205 @@ private val GoldHl = Color(0xFFE2B94E)
 private val GreenDot = Color(0xFF3DDC97)
 private val RedKing = Color(0xFFFF6B6B)
 
-/** Recurso drawable para cada pieza del conjunto Lichess. */
-internal fun pieceResource(piece: Piece, pieceSet: PieceSet = PieceSet.DEFAULT): Int = when (pieceSet) {
-    PieceSet.LICHESS, PieceSet.CHESS_COM, PieceSet.OPEN_SOURCE -> when (piece.color) {
-        ChessColor.WHITE -> when (piece.type) {
-            PieceType.PAWN -> R.drawable.piece_wp
-            PieceType.KNIGHT -> R.drawable.piece_wn
-            PieceType.BISHOP -> R.drawable.piece_wb
-            PieceType.ROOK -> R.drawable.piece_wr
-            PieceType.QUEEN -> R.drawable.piece_wq
-            PieceType.KING -> R.drawable.piece_wk
+/**
+ * Recurso drawable de cada pieza del conjunto elegido.
+ * Todos los conjuntos son los oficiales de Lichess: `ps_<clave>_<w|b><pieza>`.
+ */
+internal fun pieceResource(piece: Piece, pieceSet: PieceSet = PieceSet.DEFAULT): Int {
+    val c = if (piece.color == ChessColor.WHITE) "w" else "b"
+    val t = when (piece.type) {
+        PieceType.PAWN -> "p"
+        PieceType.KNIGHT -> "n"
+        PieceType.BISHOP -> "b"
+        PieceType.ROOK -> "r"
+        PieceType.QUEEN -> "q"
+        PieceType.KING -> "k"
+    }
+    return when (pieceSet) {
+        PieceSet.LICHESS -> when ("$c$t") {
+            "wp" -> R.drawable.ps_cburnett_wp
+            "bp" -> R.drawable.ps_cburnett_bp
+            "wn" -> R.drawable.ps_cburnett_wn
+            "bn" -> R.drawable.ps_cburnett_bn
+            "wb" -> R.drawable.ps_cburnett_wb
+            "bb" -> R.drawable.ps_cburnett_bb
+            "wr" -> R.drawable.ps_cburnett_wr
+            "br" -> R.drawable.ps_cburnett_br
+            "wq" -> R.drawable.ps_cburnett_wq
+            "bq" -> R.drawable.ps_cburnett_bq
+            "wk" -> R.drawable.ps_cburnett_wk
+            "bk" -> R.drawable.ps_cburnett_bk
+            else -> R.drawable.ps_cburnett_bk
         }
-        ChessColor.BLACK -> when (piece.type) {
-            PieceType.PAWN -> R.drawable.piece_bp
-            PieceType.KNIGHT -> R.drawable.piece_bn
-            PieceType.BISHOP -> R.drawable.piece_bb
-            PieceType.ROOK -> R.drawable.piece_br
-            PieceType.QUEEN -> R.drawable.piece_bq
-            PieceType.KING -> R.drawable.piece_bk
+        PieceSet.ALPHA -> when ("$c$t") {
+            "wp" -> R.drawable.ps_alpha_wp
+            "bp" -> R.drawable.ps_alpha_bp
+            "wn" -> R.drawable.ps_alpha_wn
+            "bn" -> R.drawable.ps_alpha_bn
+            "wb" -> R.drawable.ps_alpha_wb
+            "bb" -> R.drawable.ps_alpha_bb
+            "wr" -> R.drawable.ps_alpha_wr
+            "br" -> R.drawable.ps_alpha_br
+            "wq" -> R.drawable.ps_alpha_wq
+            "bq" -> R.drawable.ps_alpha_bq
+            "wk" -> R.drawable.ps_alpha_wk
+            "bk" -> R.drawable.ps_alpha_bk
+            else -> R.drawable.ps_alpha_bk
+        }
+        PieceSet.ANARCANDY -> when ("$c$t") {
+            "wp" -> R.drawable.ps_anarcandy_wp
+            "bp" -> R.drawable.ps_anarcandy_bp
+            "wn" -> R.drawable.ps_anarcandy_wn
+            "bn" -> R.drawable.ps_anarcandy_bn
+            "wb" -> R.drawable.ps_anarcandy_wb
+            "bb" -> R.drawable.ps_anarcandy_bb
+            "wr" -> R.drawable.ps_anarcandy_wr
+            "br" -> R.drawable.ps_anarcandy_br
+            "wq" -> R.drawable.ps_anarcandy_wq
+            "bq" -> R.drawable.ps_anarcandy_bq
+            "wk" -> R.drawable.ps_anarcandy_wk
+            "bk" -> R.drawable.ps_anarcandy_bk
+            else -> R.drawable.ps_anarcandy_bk
+        }
+        PieceSet.COMPANION -> when ("$c$t") {
+            "wp" -> R.drawable.ps_companion_wp
+            "bp" -> R.drawable.ps_companion_bp
+            "wn" -> R.drawable.ps_companion_wn
+            "bn" -> R.drawable.ps_companion_bn
+            "wb" -> R.drawable.ps_companion_wb
+            "bb" -> R.drawable.ps_companion_bb
+            "wr" -> R.drawable.ps_companion_wr
+            "br" -> R.drawable.ps_companion_br
+            "wq" -> R.drawable.ps_companion_wq
+            "bq" -> R.drawable.ps_companion_bq
+            "wk" -> R.drawable.ps_companion_wk
+            "bk" -> R.drawable.ps_companion_bk
+            else -> R.drawable.ps_companion_bk
+        }
+        PieceSet.HORSEY -> when ("$c$t") {
+            "wp" -> R.drawable.ps_horsey_wp
+            "bp" -> R.drawable.ps_horsey_bp
+            "wn" -> R.drawable.ps_horsey_wn
+            "bn" -> R.drawable.ps_horsey_bn
+            "wb" -> R.drawable.ps_horsey_wb
+            "bb" -> R.drawable.ps_horsey_bb
+            "wr" -> R.drawable.ps_horsey_wr
+            "br" -> R.drawable.ps_horsey_br
+            "wq" -> R.drawable.ps_horsey_wq
+            "bq" -> R.drawable.ps_horsey_bq
+            "wk" -> R.drawable.ps_horsey_wk
+            "bk" -> R.drawable.ps_horsey_bk
+            else -> R.drawable.ps_horsey_bk
+        }
+        PieceSet.LEIPZIG -> when ("$c$t") {
+            "wp" -> R.drawable.ps_leipzig_wp
+            "bp" -> R.drawable.ps_leipzig_bp
+            "wn" -> R.drawable.ps_leipzig_wn
+            "bn" -> R.drawable.ps_leipzig_bn
+            "wb" -> R.drawable.ps_leipzig_wb
+            "bb" -> R.drawable.ps_leipzig_bb
+            "wr" -> R.drawable.ps_leipzig_wr
+            "br" -> R.drawable.ps_leipzig_br
+            "wq" -> R.drawable.ps_leipzig_wq
+            "bq" -> R.drawable.ps_leipzig_bq
+            "wk" -> R.drawable.ps_leipzig_wk
+            "bk" -> R.drawable.ps_leipzig_bk
+            else -> R.drawable.ps_leipzig_bk
+        }
+        PieceSet.MERIDA -> when ("$c$t") {
+            "wp" -> R.drawable.ps_merida_wp
+            "bp" -> R.drawable.ps_merida_bp
+            "wn" -> R.drawable.ps_merida_wn
+            "bn" -> R.drawable.ps_merida_bn
+            "wb" -> R.drawable.ps_merida_wb
+            "bb" -> R.drawable.ps_merida_bb
+            "wr" -> R.drawable.ps_merida_wr
+            "br" -> R.drawable.ps_merida_br
+            "wq" -> R.drawable.ps_merida_wq
+            "bq" -> R.drawable.ps_merida_bq
+            "wk" -> R.drawable.ps_merida_wk
+            "bk" -> R.drawable.ps_merida_bk
+            else -> R.drawable.ps_merida_bk
+        }
+        PieceSet.PIXEL -> when ("$c$t") {
+            "wp" -> R.drawable.ps_pixel_wp
+            "bp" -> R.drawable.ps_pixel_bp
+            "wn" -> R.drawable.ps_pixel_wn
+            "bn" -> R.drawable.ps_pixel_bn
+            "wb" -> R.drawable.ps_pixel_wb
+            "bb" -> R.drawable.ps_pixel_bb
+            "wr" -> R.drawable.ps_pixel_wr
+            "br" -> R.drawable.ps_pixel_br
+            "wq" -> R.drawable.ps_pixel_wq
+            "bq" -> R.drawable.ps_pixel_bq
+            "wk" -> R.drawable.ps_pixel_wk
+            "bk" -> R.drawable.ps_pixel_bk
+            else -> R.drawable.ps_pixel_bk
+        }
+        PieceSet.RIOHACHA -> when ("$c$t") {
+            "wp" -> R.drawable.ps_riohacha_wp
+            "bp" -> R.drawable.ps_riohacha_bp
+            "wn" -> R.drawable.ps_riohacha_wn
+            "bn" -> R.drawable.ps_riohacha_bn
+            "wb" -> R.drawable.ps_riohacha_wb
+            "bb" -> R.drawable.ps_riohacha_bb
+            "wr" -> R.drawable.ps_riohacha_wr
+            "br" -> R.drawable.ps_riohacha_br
+            "wq" -> R.drawable.ps_riohacha_wq
+            "bq" -> R.drawable.ps_riohacha_bq
+            "wk" -> R.drawable.ps_riohacha_wk
+            "bk" -> R.drawable.ps_riohacha_bk
+            else -> R.drawable.ps_riohacha_bk
+        }
+        PieceSet.STAUNTY -> when ("$c$t") {
+            "wp" -> R.drawable.ps_staunty_wp
+            "bp" -> R.drawable.ps_staunty_bp
+            "wn" -> R.drawable.ps_staunty_wn
+            "bn" -> R.drawable.ps_staunty_bn
+            "wb" -> R.drawable.ps_staunty_wb
+            "bb" -> R.drawable.ps_staunty_bb
+            "wr" -> R.drawable.ps_staunty_wr
+            "br" -> R.drawable.ps_staunty_br
+            "wq" -> R.drawable.ps_staunty_wq
+            "bq" -> R.drawable.ps_staunty_bq
+            "wk" -> R.drawable.ps_staunty_wk
+            "bk" -> R.drawable.ps_staunty_bk
+            else -> R.drawable.ps_staunty_bk
+        }
+        PieceSet.TATIANA -> when ("$c$t") {
+            "wp" -> R.drawable.ps_tatiana_wp
+            "bp" -> R.drawable.ps_tatiana_bp
+            "wn" -> R.drawable.ps_tatiana_wn
+            "bn" -> R.drawable.ps_tatiana_bn
+            "wb" -> R.drawable.ps_tatiana_wb
+            "bb" -> R.drawable.ps_tatiana_bb
+            "wr" -> R.drawable.ps_tatiana_wr
+            "br" -> R.drawable.ps_tatiana_br
+            "wq" -> R.drawable.ps_tatiana_wq
+            "bq" -> R.drawable.ps_tatiana_bq
+            "wk" -> R.drawable.ps_tatiana_wk
+            "bk" -> R.drawable.ps_tatiana_bk
+            else -> R.drawable.ps_tatiana_bk
+        }
+        PieceSet.ICPIECES -> when ("$c$t") {
+            "wp" -> R.drawable.ps_icpieces_wp
+            "bp" -> R.drawable.ps_icpieces_bp
+            "wn" -> R.drawable.ps_icpieces_wn
+            "bn" -> R.drawable.ps_icpieces_bn
+            "wb" -> R.drawable.ps_icpieces_wb
+            "bb" -> R.drawable.ps_icpieces_bb
+            "wr" -> R.drawable.ps_icpieces_wr
+            "br" -> R.drawable.ps_icpieces_br
+            "wq" -> R.drawable.ps_icpieces_wq
+            "bq" -> R.drawable.ps_icpieces_bq
+            "wk" -> R.drawable.ps_icpieces_wk
+            "bk" -> R.drawable.ps_icpieces_bk
+            else -> R.drawable.ps_icpieces_bk
         }
     }
 }
 
-/** Convierte coordenadas de pantalla (fila/columna mostradas) a índice de casilla 0..63. */
+/** Convierte coordenadas de pantalla (fila/columna mostradas) a Ã­ndice de casilla 0..63. */
 internal fun displayToSquare(row: Int, col: Int, perspective: ChessColor): Int = when (perspective) {
     ChessColor.WHITE -> (7 - row) * 8 + col
     ChessColor.BLACK -> row * 8 + (7 - col)
@@ -82,7 +258,7 @@ internal fun displayToSquare(row: Int, col: Int, perspective: ChessColor): Int =
 
 /**
  * Tablero cuadrado: las piezas se dibujan con los SVG oficiales; al pulsar una
- * casilla se invoca [onSquareTap] con el índice 0..63 (0 = a1).
+ * casilla se invoca [onSquareTap] con el Ã­ndice 0..63 (0 = a1).
  */
 @Composable
 fun ChessBoard(
@@ -212,93 +388,12 @@ private fun BoardSquare(
             }
         }
         piece?.let {
-            if (pieceSet == PieceSet.LICHESS) {
-                Image(
-                    painter = painterResource(id = pieceResource(it, pieceSet)),
-                    contentDescription = it.symbol(),
-                    modifier = Modifier.fillMaxSize().padding(2.dp),
-                    contentScale = ContentScale.Fit
-                )
-            } else {
-                PieceIcon(it, Modifier.fillMaxSize().padding(1.dp), pieceSet)
-            }
-        }
-    }
-}
-
-@Composable
-fun PieceIcon(piece: Piece, modifier: Modifier = Modifier, pieceSet: PieceSet = PieceSet.CHESS_COM) {
-    val modern = pieceSet == PieceSet.CHESS_COM
-    val fill = when {
-        modern && piece.color == ChessColor.WHITE -> Color(0xFFF9F7F0)
-        modern -> Color(0xFF26384F)
-        piece.color == ChessColor.WHITE -> Color(0xFFFFF4DC)
-        else -> Color(0xFF252B34)
-    }
-    val outline = when {
-        modern && piece.color == ChessColor.WHITE -> Color(0xFF929A9E)
-        modern -> Color(0xFF9AB8D5)
-        piece.color == ChessColor.WHITE -> Color(0xFF765B3A)
-        else -> Color(0xFFD7B66B)
-    }
-    Canvas(modifier = modifier) {
-        scale(size.width / 100f, size.height / 100f, pivot = Offset.Zero) {
-            val stroke = Stroke(width = if (modern) 2.2f else 3.2f)
-            fun path(points: List<Offset>): Path = Path().apply {
-                moveTo(points.first().x, points.first().y)
-                points.drop(1).forEach { lineTo(it.x, it.y) }
-                close()
-            }
-            fun silhouette(points: List<Offset>) {
-                val p = path(points)
-                if (modern) {
-                    drawContext.transform.translate(2f, 3f)
-                    drawPath(p, Color(0x66000000))
-                    drawContext.transform.translate(-2f, -3f)
-                }
-                drawPath(p, fill)
-                drawPath(p, outline, style = stroke)
-            }
-            drawRoundRect(fill, topLeft = Offset(14f, 83f), size = Size(72f, 9f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f))
-            drawRoundRect(outline, topLeft = Offset(14f, 83f), size = Size(72f, 9f), cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f), style = stroke)
-            when (piece.type) {
-                PieceType.PAWN -> {
-                    silhouette(listOf(Offset(24f, 79f), Offset(31f, 62f), Offset(39f, 54f), Offset(32f, 48f), Offset(34f, 43f), Offset(66f, 43f), Offset(68f, 48f), Offset(61f, 54f), Offset(69f, 62f), Offset(76f, 79f)))
-                    drawCircle(fill, 12f, Offset(50f, 30f))
-                    drawCircle(outline, 12f, Offset(50f, 30f), style = stroke)
-                }
-                PieceType.ROOK -> silhouette(listOf(
-                    Offset(15f, 24f), Offset(29f, 24f), Offset(29f, 34f), Offset(40f, 34f),
-                    Offset(40f, 24f), Offset(60f, 24f), Offset(60f, 34f), Offset(71f, 34f),
-                    Offset(71f, 24f), Offset(85f, 24f), Offset(80f, 48f), Offset(73f, 56f),
-                    Offset(78f, 79f), Offset(22f, 79f), Offset(27f, 56f), Offset(20f, 48f)
-                ))
-                PieceType.KNIGHT -> silhouette(listOf(
-                    Offset(20f, 79f), Offset(27f, 61f), Offset(18f, 50f), Offset(23f, 37f),
-                    Offset(46f, 20f), Offset(43f, 34f), Offset(62f, 29f), Offset(82f, 41f),
-                    Offset(77f, 54f), Offset(65f, 61f), Offset(78f, 79f)
-                )).also {
-                    drawLine(outline, Offset(40f, 45f), Offset(47f, 45f), strokeWidth = 3f)
-                }
-                PieceType.BISHOP -> {
-                    silhouette(listOf(Offset(21f, 79f), Offset(31f, 61f), Offset(40f, 51f), Offset(34f, 42f), Offset(50f, 24f), Offset(66f, 42f), Offset(60f, 51f), Offset(69f, 61f), Offset(79f, 79f)))
-                    drawCircle(fill, 6f, Offset(50f, 28f))
-                    drawCircle(outline, 6f, Offset(50f, 28f), style = stroke)
-                    drawLine(outline, Offset(45f, 39f), Offset(55f, 49f), strokeWidth = 2.5f)
-                }
-                PieceType.QUEEN -> {
-                    silhouette(listOf(Offset(19f, 79f), Offset(28f, 56f), Offset(23f, 34f), Offset(41f, 48f), Offset(50f, 27f), Offset(59f, 48f), Offset(77f, 34f), Offset(72f, 56f), Offset(81f, 79f)))
-                    listOf(Offset(24f, 31f), Offset(50f, 21f), Offset(76f, 31f)).forEach { center ->
-                        drawCircle(fill, 6f, center)
-                        drawCircle(outline, 6f, center, style = stroke)
-                    }
-                }
-                PieceType.KING -> {
-                    silhouette(listOf(Offset(20f, 79f), Offset(30f, 58f), Offset(39f, 48f), Offset(35f, 39f), Offset(65f, 39f), Offset(61f, 48f), Offset(70f, 58f), Offset(80f, 79f)))
-                    drawLine(outline, Offset(50f, 12f), Offset(50f, 36f), strokeWidth = 4f)
-                    drawLine(outline, Offset(40f, 22f), Offset(60f, 22f), strokeWidth = 4f)
-                }
-            }
+            Image(
+                painter = painterResource(id = pieceResource(it, pieceSet)),
+                contentDescription = it.symbol(),
+                modifier = Modifier.fillMaxSize().padding(2.dp),
+                contentScale = ContentScale.Fit
+            )
         }
     }
 }

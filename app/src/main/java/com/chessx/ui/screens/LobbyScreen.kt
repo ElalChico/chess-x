@@ -23,6 +23,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -111,6 +112,14 @@ fun LobbyScreen(
     onDeleteGame: (GameRecord) -> Unit = {},
     onClearHistory: () -> Unit = {},
     onPhotoCropped: (String) -> Unit = {},
+    /** Abre la pantalla de estadisticas. */
+    onOpenStats: () -> Unit = {},
+    /** Historial especial: partidas interrumpidas que se pueden retomar. */
+    suspendedGames: List<com.chessx.data.SuspendedGame> = emptyList(),
+    /** Hay rival conectado: se puede reanudar. */
+    canResume: Boolean = false,
+    onResumeSuspended: (com.chessx.data.SuspendedGame) -> Unit = {},
+    onDiscardSuspended: (String) -> Unit = {},
     onBack: () -> Unit
 ) {
     var nameText by remember { mutableStateOf("") }
@@ -152,13 +161,11 @@ fun LobbyScreen(
         )
     }
 
-    // Inicializar nombre: vacío si primera vez, o nombre guardado para editar
+    // Inicializar nombre: vacío si primera vez, o nombre guardado para editar.
+    // Mientras el campo tiene el foco manda lo que escribe el usuario (no se sobrescribe).
+    var nameFocused by remember { mutableStateOf(false) }
     LaunchedEffect(localName) {
-        if (localName.isNotBlank()) {
-            nameText = localName
-        } else {
-            nameText = ""
-        }
+        if (!nameFocused) nameText = localName
     }
 
     Column(
@@ -253,7 +260,9 @@ fun LobbyScreen(
         OutlinedTextField(
             value = nameText,
             onValueChange = { if (it.length <= 18) { nameText = it; onNameChange(it); hasChanges = true } },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onFocusChanged { nameFocused = it.isFocused },
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             placeholder = { Text("Ej: Magnus", color = Muted) },
@@ -291,11 +300,27 @@ fun LobbyScreen(
             }
         }
 
+        // Historial especial: partidas suspendidas por perdida de conexion
+        if (suspendedGames.isNotEmpty()) {
+            SectionLabel("PARTIDAS SUSPENDIDAS")
+            suspendedGames.forEach { g ->
+                SuspendedGameCard(
+                    game = g,
+                    canResume = canResume,
+                    onResume = { onResumeSuspended(g) },
+                    onDiscard = { onDiscardSuspended(g.id) }
+                )
+            }
+        }
+
         // History (PGN) — each entry replays with its captured data
         Row(verticalAlignment = Alignment.CenterVertically) {
             SectionLabel("HISTORIAL (PGN)")
             Spacer(Modifier.weight(1f))
             if (history.isNotEmpty()) {
+                TextButton(onClick = onOpenStats) {
+                    Text("Estadísticas", color = Gold, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
                 TextButton(onClick = onClearHistory) {
                     Text("Borrar todo", color = Color(0xFFFF9B9B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
@@ -336,6 +361,74 @@ private fun SectionLabel(text: String) {
     Text(text, color = Muted, fontSize = 10.5.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
 }
 
+/**
+ * Tarjeta de partida suspendida (historial especial).
+ * Permite retomarla con el rival conectado; respeta el turno guardado.
+ */
+@Composable
+private fun SuspendedGameCard(
+    game: com.chessx.data.SuspendedGame,
+    canResume: Boolean,
+    onResume: () -> Unit,
+    onDiscard: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF1A1206), RoundedCornerShape(16.dp))
+            .border(1.dp, Color(0xFF3A2A10), RoundedCornerShape(16.dp))
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "Partida suspendida",
+                    fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Gold
+                )
+                Text(
+                    "${game.opponent} · ${game.dateLabel()}",
+                    fontSize = 11.sp, color = Text1, fontWeight = FontWeight.SemiBold
+                )
+                Text(
+                    "${game.movesCount} jugadas · ${game.timeLabel()} · " +
+                        if (game.sideToMoveWhite) "turno de las blancas" else "turno de las negras",
+                    fontSize = 10.sp, color = Muted
+                )
+            }
+            Text("⏸", fontSize = 22.sp, color = Gold)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = onResume,
+                enabled = canResume,
+                modifier = Modifier.weight(1f),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF1A1A14),
+                    contentColor = Gold,
+                    disabledContainerColor = Color(0xFF12141A),
+                    disabledContentColor = Color(0xFF6B6244)
+                ),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.2.dp, if (canResume) Color(0xFF3A3524) else Color(0xFF24231C))
+            ) {
+                Text(
+                    if (canResume) "Reanudar" else "Conecta al rival",
+                    fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1
+                )
+            }
+            OutlinedButton(
+                onClick = onDiscard,
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF4A2626))
+            ) {
+                Text("Descartar", color = Color(0xFFFF9B9B), fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+            }
+        }
+    }
+}
+
 @Composable
 private fun HistoryItem(rec: GameRecord, onReplay: () -> Unit, onDelete: () -> Unit) {
     // Determine white and black player names based on who played white
@@ -344,7 +437,25 @@ private fun HistoryItem(rec: GameRecord, onReplay: () -> Unit, onDelete: () -> U
     } else {
         rec.opponent to rec.playerName
     }
-    
+    // Resultado visto desde el jugador local (estilo chess.com)
+    val won = rec.localWon == true
+    val lost = rec.localWon == false
+    val outcomeText = when {
+        won -> "Victoria"
+        lost -> "Derrota"
+        else -> "Tablas"
+    }
+    val outcomeColor = when {
+        won -> Green
+        lost -> Color(0xFFFF6B6B)
+        else -> Color(0xFF8B96A5)
+    }
+    val winnerName = when {
+        won -> rec.playerName
+        lost -> rec.opponent
+        else -> null
+    }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -353,14 +464,33 @@ private fun HistoryItem(rec: GameRecord, onReplay: () -> Unit, onDelete: () -> U
             .padding(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(Modifier.weight(1f)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            // Etiqueta de resultado + color jugado
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Box(
+                    modifier = Modifier
+                        .background(outcomeColor.copy(alpha = 0.16f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 7.dp, vertical = 2.dp)
+                ) {
+                    Text(outcomeText, color = outcomeColor, fontSize = 10.5.sp, fontWeight = FontWeight.ExtraBold)
+                }
+                Text(
+                    if (rec.localColorWhite) "Con blancas" else "Con negras",
+                    color = Muted, fontSize = 10.sp, fontWeight = FontWeight.SemiBold
+                )
+            }
+            // Marcador: el ganador destacado
             Text(
-                "$whiteName ♔  vs  ♚ $blackName",
+                buildString {
+                    append(if (rec.localColorWhite) whiteName else blackName)
+                    append("  vs  ")
+                    append(if (rec.localColorWhite) blackName else whiteName)
+                },
                 fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Text1, maxLines = 1
             )
             Text(
                 "${rec.dateLabel()} · ${rec.result} · ${rec.movesSan.size} jugadas · ${rec.timeLabel}" +
-                    if (rec.localColorWhite) " · Juegas blancas" else " · Juegas negras",
+                    if (winnerName != null) " · Ganó $winnerName" else "",
                 fontSize = 11.sp, color = Muted, maxLines = 2
             )
         }

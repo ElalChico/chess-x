@@ -36,7 +36,8 @@ data class RemoteGame(
     val localColorWhite: Boolean = true,
     val movesSan: List<String> = emptyList(),
     val uciMoves: List<String> = emptyList(),
-    val pgn: String = ""
+    val pgn: String = "",
+    val moveClocks: List<Long> = emptyList()
 ) {
     fun dateLabel(): String = SimpleDateFormat("dd/MM/yy HH:mm", Locale.getDefault()).format(Date(dateMs))
 }

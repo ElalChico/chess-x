@@ -11,13 +11,19 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +56,15 @@ private fun decodePhoto(base64: String?): Bitmap? {
 
 // ---------- Fin de partida ----------
 
+/** Presets de control de tiempo ofrecidos al repetir o cambiar de color. */
+private val TIME_PRESETS = listOf(
+    180_000L to 0L,      // 3 + 0
+    180_000L to 2_000L,  // 3 + 2
+    300_000L to 0L,      // 5 + 0
+    600_000L to 0L,      // 10 + 0
+    900_000L to 10_000L  // 15 + 10
+)
+
 @Composable
 fun GameEndDialog(
     end: GameEnd,
@@ -61,8 +76,11 @@ fun GameEndDialog(
     localPhotoBase64: String = "",
     remotePhotoBase64: String? = null,
     winnerName: String? = null,
-    onNewGameSame: () -> Unit,
-    onNewGameRandom: () -> Unit,
+    /** Control de tiempo de la partida que acaba de terminar (para "mismo tiempo"). */
+    lastTimeMs: Long = 300_000L,
+    lastIncMs: Long = 0L,
+    onNewGameSame: (Long, Long) -> Unit,
+    onNewGameRandom: (Long, Long) -> Unit,
     onTournamentNext: () -> Unit,
     onBackToRoom: () -> Unit,
     onReplayPgn: () -> Unit,
@@ -84,6 +102,10 @@ fun GameEndDialog(
         else -> null
     }
 
+    // Selector de tiempo: se despliega al pulsar "Repetir partida" o "Nuevo color".
+    var expandSame by remember { mutableStateOf(false) }
+    var expandRandom by remember { mutableStateOf(false) }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
@@ -91,13 +113,16 @@ fun GameEndDialog(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
+                .fillMaxHeight(0.92f)
                 .background(Color(0xFF12141A), RoundedCornerShape(20.dp))
                 .border(2.dp, Color(0xFF3A3524), RoundedCornerShape(20.dp))
                 .padding(20.dp),
             contentAlignment = Alignment.Center
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -190,26 +215,53 @@ fun GameEndDialog(
 
                 EndGameOption(
                     title = "Repetir partida",
-                    subtitle = "Mismo color · misma cuenta 3-2-1",
+                    subtitle = "Mismo color · elige el tiempo",
                     enabled = true,
                     highlight = false,
-                    onClick = onNewGameSame
+                    expanded = expandSame,
+                    onClick = { expandSame = !expandSame }
                 )
+                if (expandSame) {
+                    TimeChoicePanel(
+                        lastTimeMs = lastTimeMs,
+                        lastIncMs = lastIncMs,
+                        onPick = { t, i ->
+                            expandSame = false
+                            onNewGameSame(t, i)
+                        }
+                    )
+                }
                 EndGameOption(
                     title = "Nuevo color",
-                    subtitle = "Aleatorio · siguiente partida",
+                    subtitle = "Aleatorio · elige el tiempo",
                     enabled = true,
                     highlight = false,
-                    onClick = onNewGameRandom
+                    expanded = expandRandom,
+                    onClick = { expandRandom = !expandRandom }
                 )
-                
-                // Quick time control buttons
+                if (expandRandom) {
+                    TimeChoicePanel(
+                        lastTimeMs = lastTimeMs,
+                        lastIncMs = lastIncMs,
+                        onPick = { t, i ->
+                            expandRandom = false
+                            onNewGameRandom(t, i)
+                        }
+                    )
+                }
+
+                // Atajo directo: control de tiempo libre (elige y arranca al instante)
+                Text(
+                    "O pulsa un tiempo para empezar directamente:",
+                    color = Color(0xFF8B96A5), fontSize = 11.sp, fontWeight = FontWeight.SemiBold
+                )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    QuickTimeBtn("5+0", 300000, 0, Modifier.weight(1f)) { onNewGameCustomTime(300000, 0) }
+                    QuickTimeBtn("3+0", 180000, 0, Modifier.weight(1f)) { onNewGameCustomTime(180000, 0) }
                     QuickTimeBtn("3+2", 180000, 2000, Modifier.weight(1f)) { onNewGameCustomTime(180000, 2000) }
+                    QuickTimeBtn("5+0", 300000, 0, Modifier.weight(1f)) { onNewGameCustomTime(300000, 0) }
                     QuickTimeBtn("10+0", 600000, 0, Modifier.weight(1f)) { onNewGameCustomTime(600000, 0) }
                     QuickTimeBtn("15+10", 900000, 10000, Modifier.weight(1f)) { onNewGameCustomTime(900000, 10000) }
                 }
@@ -253,12 +305,19 @@ fun GameEndDialog(
 }
 
 @Composable
-private fun EndGameOption(title: String, subtitle: String, enabled: Boolean, highlight: Boolean, onClick: () -> Unit) {
+private fun EndGameOption(
+    title: String,
+    subtitle: String,
+    enabled: Boolean,
+    highlight: Boolean,
+    expanded: Boolean = false,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(if (enabled) Color(0xFF151C25) else Color(0xFF12141A), RoundedCornerShape(13.dp))
-            .border(1.dp, if (highlight) Color(0xFFE2B94E) else Color(0xFF232C38), RoundedCornerShape(13.dp))
+            .border(1.dp, if (highlight || expanded) Color(0xFFE2B94E) else Color(0xFF232C38), RoundedCornerShape(13.dp))
             .clickable(enabled = enabled) { onClick() }
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
@@ -272,7 +331,110 @@ private fun EndGameOption(title: String, subtitle: String, enabled: Boolean, hig
             )
             Text(subtitle, fontSize = 11.sp, color = Color(0xFF8B96A5))
         }
-        Text("→", color = if (highlight) Color(0xFFE2B94E) else Color(0xFF232C38), fontWeight = FontWeight.ExtraBold, fontSize = 16.sp)
+        Text(
+            if (expanded) "▾" else "→",
+            color = if (highlight || expanded) Color(0xFFE2B94E) else Color(0xFF232C38),
+            fontWeight = FontWeight.ExtraBold, fontSize = 16.sp
+        )
+    }
+}
+
+/**
+ * Panel de eleccion de tiempo al repetir la partida o cambiar de color:
+ * "mismo tiempo" (el de la partida recien terminada), presets o personalizado.
+ */
+@Composable
+private fun TimeChoicePanel(
+    lastTimeMs: Long,
+    lastIncMs: Long,
+    onPick: (Long, Long) -> Unit
+) {
+    var minutes by remember { mutableIntStateOf((lastTimeMs / 60_000).toInt().coerceIn(1, 120)) }
+    var increment by remember { mutableIntStateOf((lastIncMs / 1000).toInt().coerceIn(0, 60)) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFF0F141B), RoundedCornerShape(13.dp))
+            .border(1.dp, Color(0xFF3A3524), RoundedCornerShape(13.dp))
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        // Mismo tiempo que la partida anterior
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFF1A1A14), RoundedCornerShape(11.dp))
+                .border(1.2.dp, Color(0xFFE2B94E), RoundedCornerShape(11.dp))
+                .clickable { onPick(lastTimeMs, lastIncMs) }
+                .padding(vertical = 10.dp, horizontal = 12.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                "Mismo tiempo (${if (lastTimeMs == 0L) "∞" else "${lastTimeMs / 60_000} + ${lastIncMs / 1000}"})",
+                fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFE2B94E)
+            )
+        }
+
+        Text("O elige otro", color = Color(0xFF8B96A5), fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            TIME_PRESETS.forEach { (t, i) ->
+                val label = if (t == 0L) "∞" else "${t / 60_000}+${i / 1000}"
+                QuickTimeBtn(label, t, i, Modifier.weight(1f)) { onPick(t, i) }
+            }
+        }
+
+        // Personalizado
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            MiniStepper("min", minutes) { minutes = it.coerceIn(1, 120) }
+            MiniStepper("+s", increment) { increment = it.coerceIn(0, 60) }
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .background(Color(0xFF151C25), RoundedCornerShape(11.dp))
+                    .border(1.dp, Color(0xFF2F3947), RoundedCornerShape(11.dp))
+                    .clickable { onPick(minutes * 60_000L, increment * 1000L) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "$minutes+$increment",
+                    fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFEEF1F5)
+                )
+            }
+        }
+    }
+}
+
+/** Stepper compacto para el tiempo personalizado. */
+@Composable
+private fun MiniStepper(label: String, value: Int, onChange: (Int) -> Unit) {
+    Row(
+        modifier = Modifier
+            .background(Color(0xFF151C25), RoundedCornerShape(11.dp))
+            .border(1.dp, Color(0xFF2F3947), RoundedCornerShape(11.dp))
+            .padding(horizontal = 4.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier.size(24.dp).background(Color(0xFF0F141B), RoundedCornerShape(7.dp)).clickable { onChange(value - 1) },
+            contentAlignment = Alignment.Center
+        ) { Text("−", color = Color(0xFFEEF1F5), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 4.dp)) {
+            Text("$value", color = Color(0xFFEEF1F5), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+            Text(label, color = Color(0xFF8B96A5), fontSize = 8.sp)
+        }
+        Box(
+            Modifier.size(24.dp).background(Color(0xFF0F141B), RoundedCornerShape(7.dp)).clickable { onChange(value + 1) },
+            contentAlignment = Alignment.Center
+        ) { Text("+", color = Color(0xFFEEF1F5), fontSize = 13.sp, fontWeight = FontWeight.Bold) }
     }
 }
 
@@ -406,14 +568,8 @@ private fun ScoreRow(title: String, wins: Int, pieceColor: Color, badgeColor: Co
 
 // ---------- Promoción ----------
 
-private fun pieceRes(pieceType: PieceType, color: ChessColor): Int = when (pieceType) {
-    PieceType.PAWN -> if (color == ChessColor.WHITE) R.drawable.piece_wp else R.drawable.piece_bp
-    PieceType.KNIGHT -> if (color == ChessColor.WHITE) R.drawable.piece_wn else R.drawable.piece_bn
-    PieceType.BISHOP -> if (color == ChessColor.WHITE) R.drawable.piece_wb else R.drawable.piece_bb
-    PieceType.ROOK -> if (color == ChessColor.WHITE) R.drawable.piece_wr else R.drawable.piece_br
-    PieceType.QUEEN -> if (color == ChessColor.WHITE) R.drawable.piece_wq else R.drawable.piece_bq
-    PieceType.KING -> if (color == ChessColor.WHITE) R.drawable.piece_wk else R.drawable.piece_bk
-}
+private fun pieceRes(pieceType: PieceType, color: ChessColor, pieceSet: PieceSet): Int =
+    pieceResource(Piece(pieceType, color), pieceSet)
 
 @Composable
 fun PromotionPieceDialog(
@@ -459,19 +615,11 @@ fun PromotionPieceDialog(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.clickable { onPromote(pt) }
                         ) {
-                            if (pieceSet == PieceSet.LICHESS) {
-                                androidx.compose.foundation.Image(
-                                    painter = androidx.compose.ui.res.painterResource(id = pieceRes(pt, localColor)),
-                                    contentDescription = pt.name,
-                                    modifier = Modifier.size(46.dp)
-                                )
-                            } else {
-                                com.chessx.ui.components.PieceIcon(
-                                    piece = Piece(pt, localColor),
-                                    modifier = Modifier.size(46.dp),
-                                    pieceSet = pieceSet
-                                )
-                            }
+                            androidx.compose.foundation.Image(
+                                painter = androidx.compose.ui.res.painterResource(id = pieceRes(pt, localColor, pieceSet)),
+                                contentDescription = pt.name,
+                                modifier = Modifier.size(46.dp)
+                            )
                             Text(
                                 pt.name.take(1).uppercase(),
                                 fontSize = 11.sp,

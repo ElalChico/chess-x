@@ -1,6 +1,7 @@
 package com.chessx.ui
 
 import android.content.Context
+import java.util.UUID
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
@@ -37,7 +38,10 @@ data class UiGameState(
     val promotionPending: Pair<Int, Int>? = null, // from->to awaiting promotion choice
     val countdown: Int? = null, // null = jugando/terminado · 3..1 = cuenta regresiva en curso
     val tournament: TournamentState = TournamentState(),
-    val sessionGames: Int = 0 // partidas jugadas en esta sesión (nueva partida)
+    val sessionGames: Int = 0, // partidas jugadas en esta sesión (nueva partida)
+    val suspendedGames: List<com.chessx.data.SuspendedGame> = emptyList(),
+    /** Hay una partida suspendida lista para continuar (rival conectado). */
+    val canResume: Boolean = false
 )
 
 /**
@@ -68,6 +72,12 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
     private var pendingDrawOffer = false
     private var checkSignalEnabled: Boolean = true
     private var lastLocalColor: Color = Color.WHITE
+    /** Id estable de la partida en curso: permite reescribir la misma entrada suspendida. */
+    private var suspendedGameId: String? = null
+
+    /** Historial especial: partidas interrumpidas que se pueden retomar. */
+    private val _suspendedGames = MutableStateFlow<List<com.chessx.data.SuspendedGame>>(emptyList())
+    val suspendedGames: StateFlow<List<com.chessx.data.SuspendedGame>> = _suspendedGames.asStateFlow()
 
     // Estados de diálogo personalizados
     private val _showGameEndDialog = MutableStateFlow(false)
@@ -89,9 +99,12 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
 
     fun init() {
         if (this::bluetooth.isInitialized) return
-        bluetooth = BluetoothClassicManager(appContext, viewModelScope)
+        val prefs = appContext.getSharedPreferences("chessbt_prefs", Context.MODE_PRIVATE)
+        val btId = prefs.getString("bt_identifier", null)
+        bluetooth = BluetoothClassicManager(appContext, viewModelScope, btId)
         sound = SoundManager(appContext)
-        checkSignalEnabled = appContext.getSharedPreferences("chessbt_prefs", Context.MODE_PRIVATE).getBoolean("check_sig", true)
+        checkSignalEnabled = prefs.getBoolean("check_sig", true)
+        _suspendedGames.value = com.chessx.data.SuspendedGameStore.load(appContext)
         
         // Connection notification callback
         bluetooth.onConnected = {
@@ -133,9 +146,16 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
         viewModelScope.launch {
             bluetooth.state.collect { st ->
                 val connected = st == BtState.CONNECTED
+                val wasConnected = _ui.value.connected
                 _ui.value = _ui.value.copy(connected = connected,
                     lobby = _ui.value.lobby.copy(connected = connected))
                 if (!connected) _remoteProfile.value = null
+                if (!connected && wasConnected) {
+                    onBluetoothLost()
+                } else if (connected && !wasConnected) {
+                    onBluetoothRestored()
+                }
+                refreshResumeAvailability()
             }
         }
         viewModelScope.launch {
@@ -145,11 +165,230 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
         }
     }
 
+    // ══════════════════════════════════════════════════════════════════
+    // PARTIDA SUSPENDIDA · se congela al perder el Bluetooth y se puede
+    // retomar mas tarde respetando el turno de cada jugador.
+    // ══════════════════════════════════════════════════════════════════
+
+    /** ¿Hay una partida en curso que se pueda suspender? */
+    private fun gameInProgress(): Boolean =
+        _ui.value.lobby.gameStarted && _ui.value.gameEnd == null && !_ui.value.countdown.let { it != null }
+
+    /**
+     * Se ha perdido el enlace Bluetooth con el rival.
+     * Se congela el reloj (el tiempo no corre sin conexión) y se guarda el
+     * estado completo de la partida en el historial especial.
+     */
+    private fun onBluetoothLost() {
+        if (!gameInProgress()) return
+        try { clock.setPaused(true) } catch (_: Exception) { }
+        persistSuspendedGame()
+        _ui.value = _ui.value.copy(
+            paused = true,
+            lastError = "Conexión perdida · partida en pausa · puedes retomarla cuando vuelva el rival"
+        )
+    }
+
+    /**
+     * Vuelve el enlace Bluetooth. Si había una partida congelada por la
+     * desconexión, el anfitrión reenvía el estado completo y ambos continues
+     * con el turno que les correspondía.
+     */
+    private fun onBluetoothRestored() {
+        val frozen = _ui.value.lobby.gameStarted && _ui.value.gameEnd == null && _ui.value.paused
+        if (!frozen) return
+        if (isHost) {
+            val snap = buildSuspendedSnapshot() ?: return
+            try { sendResumeMessage(snap) } catch (_: Exception) { }
+            applyResumeState(
+                fen = snap.fen, san = snap.movesSan, uci = snap.uciMoves, clocks = snap.moveClocks,
+                whiteMs = snap.whiteMs, blackMs = snap.blackMs,
+                localColor = _ui.value.localColor,
+                timeMs = snap.timeMs, incrementMs = snap.incrementMs,
+                lastFrom = snap.lastFrom, lastTo = snap.lastTo
+            )
+            clearSuspendedEntry(snap.id)
+            _ui.value = _ui.value.copy(lastError = "Reconectado · partida reanudada")
+        } else {
+            _ui.value = _ui.value.copy(lastError = "Reconectado · esperando al anfitrión para reanudar")
+        }
+    }
+
+    /** Construye el estado guardable de la partida en curso. */
+    private fun buildSuspendedSnapshot(): com.chessx.data.SuspendedGame? {
+        val fen = try { engine.toFEN() } catch (_: Exception) { return null }
+        if (fen.isBlank()) return null
+        val cs = clock.state.value
+        val lastMove = _ui.value.selection.lastMove
+        val id = suspendedGameId ?: java.util.UUID.randomUUID().toString().also { suspendedGameId = it }
+        return com.chessx.data.SuspendedGame(
+            id = id,
+            dateMs = System.currentTimeMillis(),
+            opponent = remoteName.ifBlank { "Rival" },
+            opponentPhotoBase64 = _remoteProfile.value?.photoBase64,
+            fen = fen,
+            uciMoves = uciHistory.toList(),
+            movesSan = moveHistory.toList(),
+            moveClocks = moveClockHistory.toList(),
+            whiteMs = cs.whiteMs,
+            blackMs = cs.blackMs,
+            timeMs = _ui.value.lobby.timeMs,
+            incrementMs = _ui.value.lobby.incrementMs,
+            localColorWhite = _ui.value.localColor == Color.WHITE,
+            lastFrom = lastMove?.first ?: -1,
+            lastTo = lastMove?.second ?: -1
+        )
+    }
+
+    /** Guarda la partida suspendida en disco (al perder el enlace o al salir de la app). */
+    fun persistSuspendedGame() {
+        if (!gameInProgress()) return
+        val snap = buildSuspendedSnapshot() ?: return
+        try {
+            com.chessx.data.SuspendedGameStore.save(appContext, snap)
+            _suspendedGames.value = com.chessx.data.SuspendedGameStore.load(appContext)
+        } catch (_: Exception) { }
+    }
+
+    private fun clearSuspendedEntry(id: String) {
+        try {
+            com.chessx.data.SuspendedGameStore.remove(appContext, id)
+            _suspendedGames.value = com.chessx.data.SuspendedGameStore.load(appContext)
+        } catch (_: Exception) { }
+    }
+
+    /** Descarta una partida suspendida sin retomarla. */
+    fun discardSuspendedGame(id: String) {
+        clearSuspendedEntry(id)
+        refreshResumeAvailability()
+    }
+
+    /** Actualiza si hay una partida suspendida lista para continuar. */
+    private fun refreshResumeAvailability() {
+        val games = _suspendedGames.value
+        val can = games.isNotEmpty() && _ui.value.connected
+        _ui.value = _ui.value.copy(suspendedGames = games, canResume = can)
+    }
+
+    /**
+     * Reanuda una partida suspendida. Solo el anfitrión puede lanzarla:
+     * el necesita ser el que envíe el estado completo al invitado.
+     */
+    fun resumeSuspendedGame(game: com.chessx.data.SuspendedGame): Boolean {
+        if (!_ui.value.connected) {
+            showError("Conecta con el rival antes de reanudar")
+            return false
+        }
+        if (!isHost) {
+            showError("Solo el anfitrión puede reanudar la partida")
+            return false
+        }
+        val snap = game.copy(localColorWhite = _ui.value.localColor == Color.WHITE)
+        try { sendResumeMessage(snap) } catch (_: Exception) { }
+        applyResumeState(
+            fen = snap.fen, san = snap.movesSan, uci = snap.uciMoves, clocks = snap.moveClocks,
+            whiteMs = snap.whiteMs, blackMs = snap.blackMs,
+            localColor = _ui.value.localColor,
+            timeMs = snap.timeMs, incrementMs = snap.incrementMs,
+            lastFrom = snap.lastFrom, lastTo = snap.lastTo
+        )
+        clearSuspendedEntry(snap.id)
+        _ui.value = _ui.value.copy(lastError = "Partida reanudada · turno de ${if (_ui.value.isLocalTurn) "ti" else "tu rival"}")
+        return true
+    }
+
+    /** Envía el estado completo de la partida (solo anfitrión). */
+    private fun sendResumeMessage(snap: com.chessx.data.SuspendedGame) {
+        bluetooth.send(
+            com.chessx.data.ResumeGameMessage(
+                fen = snap.fen,
+                uciJson = org.json.JSONArray(snap.uciMoves).toString(),
+                sanJson = org.json.JSONArray(snap.movesSan).toString(),
+                clocksJson = org.json.JSONArray(snap.moveClocks).toString(),
+                whiteMs = snap.whiteMs,
+                blackMs = snap.blackMs,
+                timeMs = snap.timeMs,
+                incrementMs = snap.incrementMs,
+                hostColor = com.chessx.data.MessageParser.stringFromColor(_ui.value.localColor),
+                hostName = localName,
+                guestName = remoteName.ifBlank { "Rival" },
+                lastFrom = snap.lastFrom,
+                lastTo = snap.lastTo,
+                timestamp = System.currentTimeMillis()
+            )
+        )
+    }
+
+    /**
+     * Restaura la partida en este móvil: posición, historial, relojes y turno.
+     * El turno sale del propio FEN (side-to-move), de modo que siempre continúa
+     * quien tenía que mover.
+     */
+    private fun applyResumeState(
+        fen: String,
+        san: List<String>,
+        uci: List<String>,
+        clocks: List<Long>,
+        whiteMs: Long,
+        blackMs: Long,
+        localColor: Color,
+        timeMs: Long,
+        incrementMs: Long,
+        lastFrom: Int,
+        lastTo: Int
+    ) {
+        val ok = try { engine.parseFEN(fen) } catch (_: Exception) { false }
+        if (!ok) {
+            showError("No se pudo restaurar la partida")
+            return
+        }
+        moveHistory.clear(); moveHistory.addAll(san)
+        uciHistory.clear(); uciHistory.addAll(uci)
+        moveClockHistory.clear(); moveClockHistory.addAll(clocks)
+        lastLocalColor = localColor
+        val sideToMove = engine.sideToMove()
+        clock.configure(timeMs, incrementMs)
+        clock.restore(whiteMs, blackMs, sideToMove)
+        val inCheck = engine.isInCheck(sideToMove)
+        _ui.value = _ui.value.copy(
+            snapshot = engine.snapshot,
+            localColor = localColor,
+            remoteColor = localColor.opposite(),
+            isLocalTurn = sideToMove == localColor,
+            selection = BoardSelection(
+                from = null,
+                legalTargets = emptyList(),
+                lastMove = if (lastFrom in 0..63 && lastTo in 0..63) Pair(lastFrom, lastTo) else null,
+                checkKingSquare = if (inCheck && checkSignalEnabled) engine.findKing(sideToMove) else null
+            ),
+            inCheck = inCheck,
+            checkKing = if (inCheck && checkSignalEnabled) engine.findKing(sideToMove) else null,
+            paused = false,
+            gameEnd = null,
+            promotionPending = null,
+            countdown = null,
+            lastError = null,
+            history = moveHistory.toList(),
+            lobby = _ui.value.lobby.copy(
+                gameStarted = true,
+                connected = true,
+                timeMs = timeMs,
+                incrementMs = incrementMs,
+                localColor = localColor,
+                remoteColor = localColor.opposite()
+            )
+        )
+        clock.start()
+        try { clock.setPaused(false) } catch (_: Exception) { }
+    }
+
     // ---------- Lobby / setup ----------
     fun setLocalName(name: String) {
-        localName = name.trim().ifBlank { (100000 + java.util.Random().nextInt(900000)).toString() }.take(20)
+        // Puede quedar vacio mientras el usuario edita el campo: no se inventa un ID
+        // (si se hiciera, el texto reapareceria en el campo al perder el foco).
+        localName = name.trim().take(20)
         _ui.value = _ui.value.copy(localName = localName, lobby = _ui.value.lobby.copy(localName = localName))
-        bluetooth.updateHostName(localName)
+        bluetooth.updateHostName(localName.ifBlank { "Jugador" })
     }
 
     fun setIsHost(host: Boolean) {
@@ -189,7 +428,7 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
 
     fun sendHello() {
         val color = if (isHost) "white" else "black"
-        bluetooth.send(HelloMessage(localName, isHost, color))
+        bluetooth.send(HelloMessage(localName.ifBlank { "Jugador" }, isHost, color))
     }
 
     /** Envía el perfil propio por SPP respetando la privacidad (foto / historial / PGN). */
@@ -203,36 +442,37 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
                 val gamesJson = if (prefs.privacy.shareHistory) buildHistoryJson(records, prefs.privacy.sharePgn) else "[]"
                 val photo = if (prefs.privacy.sharePhoto) downscaledPhotoBase64(prefs.profilePhotoBase64) else ""
                 val color = if (_ui.value.lobby.colorRandom) "random" else MessageParser.stringFromColor(_ui.value.lobby.localColor)
-                bluetooth.send(ProfileMessage(localName, color, photo, records.size, wins, draws, losses, gamesJson))
+                bluetooth.send(ProfileMessage(localName.ifBlank { "Jugador" }, color, photo, records.size, wins, draws, losses, gamesJson))
             } catch (_: Exception) { }
         }
     }
 
     /** JSON con el historial (máx 30 partidas). PGN incluida sólo si sharePgn. */
     private fun buildHistoryJson(records: List<GameRecord>, sharePgn: Boolean): String {
-    val arr = JSONArray()
-    for (r in records.take(30)) {
-        val o = JSONObject()
-        o.put("d", r.dateMs)
-        o.put("res", r.result)
-        r.localWon?.let { o.put("lw", it) }
-        o.put("n", r.movesSan.size)
-        o.put("t", r.timeLabel)
-        o.put("me", r.playerName)
-        o.put("opp", r.opponent)
-        o.put("white", r.localColorWhite)
-        if (sharePgn) {
-            o.put("san", JSONArray(r.movesSan))
-            o.put("uci", JSONArray(r.uciMoves))
-            o.put("pgn", r.pgn)
+        val arr = JSONArray()
+        for (r in records.take(30)) {
+            val o = JSONObject()
+            o.put("d", r.dateMs)
+            o.put("res", r.result)
+            r.localWon?.let { o.put("lw", it) }
+            o.put("n", r.movesSan.size)
+            o.put("t", r.timeLabel)
+            o.put("me", r.playerName)
+            o.put("opp", r.opponent)
+            o.put("white", r.localColorWhite)
+            if (sharePgn) {
+                o.put("san", JSONArray(r.movesSan))
+                o.put("uci", JSONArray(r.uciMoves))
+                o.put("pgn", r.pgn)
+                if (r.moveClocks.isNotEmpty()) o.put("clk", JSONArray(r.moveClocks))
+            }
+            arr.put(o)
+            if (arr.toString().length > 15_000) {
+                arr.remove(arr.length() - 1)
+                break
+            }
         }
-        arr.put(o)
-        if (arr.toString().length > 15_000) {
-            arr.remove(arr.length() - 1)
-            break
-        }
-    }
-    return arr.toString()
+        return arr.toString()
     }
 
     /** Reduce la foto de perfil a <=128px JPEG para que quepa por SPP. */
@@ -269,18 +509,48 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
                     localColorWhite = o.optBoolean("white", true),
                     movesSan = jsonStringList(o.optJSONArray("san")),
                     uciMoves = jsonStringList(o.optJSONArray("uci")),
-                    pgn = o.optString("pgn", "")
+                    pgn = o.optString("pgn", ""),
+                    moveClocks = jsonLongList(o.optJSONArray("clk"))
                 ))
             }
             out
         } catch (_: Exception) { emptyList() }
     }
 
+    private fun jsonLongList(array: JSONArray?): List<Long> =
+        array?.let { values -> (0 until values.length()).mapNotNull { index -> values.optLong(index).takeIf { it > 0 } } }
+            ?: emptyList()
+
     private fun jsonStringList(array: JSONArray?): List<String> =
         array?.let { values -> (0 until values.length()).mapNotNull { index -> values.optString(index).takeIf { it.isNotBlank() } } }
             ?: emptyList()
 
     private fun handleProfileMessage(msg: ProfileMessage) {
+        val remoteGames = parseRemoteGames(msg.gamesJson)
+        // Sincronizar historial local con el perfil remoto: agregar juegos que no existan
+        val currentLocal = GameHistoryStore.load(appContext)
+        val localIds = currentLocal.map { it.opponent to it.result to it.movesSan.size }.toSet()
+        for (g in remoteGames) {
+            val key = g.opponent to g.result to g.moves
+            if (!localIds.contains(key)) {
+                val newRecord = GameRecord(
+                    id = UUID.randomUUID().toString(),
+                    dateMs = g.dateMs,
+                    opponent = g.opponent,
+                    result = g.result,
+                    localWon = g.won,
+                    localColorWhite = g.localColorWhite,
+                    timeLabel = g.timeLabel,
+                    movesSan = g.movesSan,
+                    pgn = g.pgn,
+                    finalFen = "",
+                    playerName = localName,
+                    uciMoves = g.uciMoves,
+                    moveClocks = g.moveClocks
+                )
+                GameHistoryStore.append(appContext, newRecord)
+            }
+        }
         _remoteProfile.value = RemoteProfile(
             name = msg.name.ifBlank { "Rival" },
             color = msg.color,
@@ -289,7 +559,7 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
             wins = msg.wins,
             draws = msg.draws,
             losses = msg.losses,
-            games = parseRemoteGames(msg.gamesJson)
+            games = remoteGames
         )
     }
 
@@ -323,14 +593,25 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
         startGameInternal(lobby.localColor, lobby.timeMs, lobby.incrementMs)
     }
 
-    /** Nueva partida tras terminar: "same" (mismo color y tiempo), "random" o "tournament". */
-    fun requestNewGame(mode: String) {
+    /**
+     * Nueva partida tras terminar:
+     *  - "same": mismo color (el del jugador local)
+     *  - "random": color aleatorio
+     *  - "tournament": siguiente partida del torneo
+     *
+     * `timeMs`/`incMs` permiten elegir el control de tiempo (si son negativos
+     * se reutiliza el de la sala). El invitado envía la petición al anfitrión
+     * con el tiempo elegido.
+     */
+    fun requestNewGame(mode: String, timeMs: Long = -1L, incMs: Long = -1L) {
         val lobby = _ui.value.lobby
+        val t = if (timeMs >= 0) timeMs else lobby.timeMs
+        val i = if (incMs >= 0) incMs else lobby.incrementMs
         when (mode) {
-            "same" -> if (isHost) startGameInternal(lastLocalColor, lobby.timeMs, lobby.incrementMs)
-                      else bluetooth.send(RematchMessage("same", localName))
-            "random" -> if (isHost) startGameInternal(randomSide(), lobby.timeMs, lobby.incrementMs)
-                        else bluetooth.send(RematchMessage("random", localName))
+            "same" -> if (isHost) startGameInternal(lastLocalColor, t, i)
+                      else bluetooth.send(RematchMessage("same", localName, t, i))
+            "random" -> if (isHost) startGameInternal(randomSide(), t, i)
+                        else bluetooth.send(RematchMessage("random", localName, t, i))
             "tournament" -> if (isHost) advanceTournament() else bluetooth.send(RematchMessage("tournament", localName))
         }
     }
@@ -343,6 +624,12 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
             inCheck = false, checkKing = null, selection = BoardSelection(null),
             lobby = _ui.value.lobby.copy(gameStarted = false)
         )
+    }
+
+    /** Cierra el cuadro de fin de partida sin tocar el resultado guardado. */
+    fun dismissGameEnd() {
+        if (_ui.value.gameEnd == null) return
+        _ui.value = _ui.value.copy(gameEnd = null)
     }
 
     private fun randomSide(): Color = if (kotlin.random.Random.nextBoolean()) Color.WHITE else Color.BLACK
@@ -416,11 +703,19 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
     }
 
     private fun startGameInternal(myColor: Color, timeMs: Long, incMs: Long) {
+        // Punto único de control: nunca se empieza una partida sin rival conectado.
+        // Cubre crear partida, revancha, torneo y revancha solicitada por Bluetooth.
+        if (!_ui.value.connected) {
+            showError("Conecta con el rival antes de comenzar")
+            return
+        }
         lastLocalColor = myColor
         engine.reset()
         moveHistory.clear()
         uciHistory.clear()
         moveClockHistory.clear()
+        // Nueva partida: se cierra la partida suspendida anterior, si la había.
+        suspendedGameId = null
         val fen = engine.toFEN()
         clock.configure(timeMs, incMs)
         _ui.value = _ui.value.copy(
@@ -672,6 +967,23 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
                     }
                 } catch (e: Exception) { Log_w("move", e) }
             }
+            is ResumeGameMessage -> {
+                try {
+                    val san = jsonToStrings(msg.sanJson)
+                    val uci = jsonToStrings(msg.uciJson)
+                    val clocks = jsonToLongs(msg.clocksJson)
+                    val hostColor = MessageParser.colorFromString(msg.hostColor)
+                    val local = hostColor.opposite()
+                    applyResumeState(
+                        fen = msg.fen, san = san, uci = uci, clocks = clocks,
+                        whiteMs = msg.whiteMs, blackMs = msg.blackMs,
+                        localColor = local,
+                        timeMs = msg.timeMs, incrementMs = msg.incrementMs,
+                        lastFrom = msg.lastFrom, lastTo = msg.lastTo
+                    )
+                    _ui.value = _ui.value.copy(lastError = "Partida reanudada por el anfitrión")
+                } catch (e: Exception) { Log_w("resume", e) }
+            }
             is PauseMessage -> {
                 _ui.value = _ui.value.copy(paused = msg.paused, pauseBy = msg.byName)
                 clock.setPaused(msg.paused)
@@ -723,14 +1035,14 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
             is ProfileMessage -> handleProfileMessage(msg)
             is RematchMessage -> {
                 if (!isHost) return
+                val lobby = _ui.value.lobby
+                // El invitado puede proponer un control de tiempo distinto.
+                val t = if (msg.timeMs >= 0) msg.timeMs else lobby.timeMs
+                val i = if (msg.incrementMs >= 0) msg.incrementMs else lobby.incrementMs
                 when (msg.mode) {
-                    "same" -> startGameInternal(lastLocalColor, _ui.value.lobby.timeMs, _ui.value.lobby.incrementMs)
-                    "random" -> startGameInternal(randomSide(), _ui.value.lobby.timeMs, _ui.value.lobby.incrementMs)
-                    "custom" -> {
-                        val timeMs = if (msg.timeMs > 0) msg.timeMs else _ui.value.lobby.timeMs
-                        val incMs = if (msg.incrementMs >= 0) msg.incrementMs else _ui.value.lobby.incrementMs
-                        startGameInternal(lastLocalColor, timeMs, incMs)
-                    }
+                    "same" -> startGameInternal(lastLocalColor, t, i)
+                    "random" -> startGameInternal(randomSide(), t, i)
+                    "custom" -> startGameInternal(lastLocalColor, t, i)
                     "tournament" -> advanceTournament()
                 }
             }
@@ -774,6 +1086,9 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
                 opponentPhotoBase64 = opponentPhoto
             )
             GameHistoryStore.append(appContext, base.copy(pgn = buildPgn(base, whiteName, blackName)))
+            // La partida ya terminó: deja de estar suspendida.
+            suspendedGameId?.let { clearSuspendedEntry(it) }
+            suspendedGameId = null
         } catch (_: Exception) { }
     }
 
@@ -834,8 +1149,30 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
     }
 
     fun disconnect() {
+        // Si hay una partida en curso, se guarda como suspendida antes de soltar el socket.
+        try { persistSuspendedGame() } catch (_: Exception) { }
         try { bluetooth.disconnect() } catch (_: Exception) {}
         try { clock.stop() } catch (_: Exception) {}
+    }
+
+    /** Lee un array JSON de cadenas. */
+    private fun jsonToStrings(raw: String): List<String> {
+        val out = mutableListOf<String>()
+        try {
+            val arr = org.json.JSONArray(raw)
+            for (i in 0 until arr.length()) out.add(arr.optString(i, ""))
+        } catch (_: Exception) { }
+        return out
+    }
+
+    /** Lee un array JSON de enteros largos. */
+    private fun jsonToLongs(raw: String): List<Long> {
+        val out = mutableListOf<Long>()
+        try {
+            val arr = org.json.JSONArray(raw)
+            for (i in 0 until arr.length()) out.add(arr.optLong(i, 0L))
+        } catch (_: Exception) { }
+        return out
     }
 
     fun onClearedCleanup() {

@@ -3,6 +3,7 @@ package com.chessx.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -11,8 +12,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import android.app.Activity
@@ -32,13 +37,17 @@ import androidx.compose.ui.platform.LocalContext
 import com.chessx.data.AppLanguage
 import com.chessx.data.AppPreferences
 import com.chessx.data.BoardTheme
+import com.chessx.data.PieceSet
 import com.chessx.data.UpdateManager
 import com.chessx.data.UpdateState
 import com.chessx.data.UpdateCheckResult
 import com.chessx.core.ChessEngine
 import com.chessx.core.Color as ChessColor
+import com.chessx.core.Piece
+import com.chessx.core.PieceType
 import com.chessx.ui.components.BoardSelection
 import com.chessx.ui.components.ChessBoard
+import com.chessx.ui.components.pieceResource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -101,7 +110,7 @@ fun SettingsScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BoardTheme.entries.forEach { theme ->
                     val sel = prefs.boardTheme == theme
-                    Chip(if (isEn) theme.labelEn else theme.labelEs, sel, Modifier.weight(1f)) { prefs.setBoardTheme(theme) }
+                    ThemeChip(theme, sel, Modifier.weight(1f), isEn, prefs.pieceSet) { prefs.setBoardTheme(theme) }
                 }
             }
             ToggleRow(
@@ -114,6 +123,58 @@ fun SettingsScreen(
                 t("Solo en jaque o jaque mate", "Only on check or checkmate"),
                 prefs.checkSignal
             ) { prefs.setCheckSignal(it) }
+        }
+
+        // ============ PIEZAS ============
+        Section(t("PIEZAS", "PIECES"))
+        SectionBody {
+            Text(
+                t("Conjunto de piezas", "Piece set"),
+                color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp
+            )
+            // Rejilla 3x4 con los 12 juegos oficiales de Lichess
+            PieceSet.entries.chunked(3).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { ps ->
+                        val sel = prefs.pieceSet == ps
+                        PieceSetChip(ps, sel, Modifier.weight(1f), isEn, prefs.boardTheme) { prefs.setPieceSet(ps) }
+                    }
+                    repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                }
+            }
+            // Vista previa de las piezas sobre casillas reales del tema elegido
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    PREVIEW_TYPES.forEachIndexed { i, type ->
+                        Box(
+                            Modifier.weight(1f).aspectRatio(1f)
+                                .background(if (i % 2 == 0) prefs.boardTheme.lightSquare else prefs.boardTheme.darkSquare),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            PreviewPiece(Piece(type, ChessColor.WHITE), prefs.pieceSet, Modifier.fillMaxSize().padding(3.dp))
+                        }
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    PREVIEW_TYPES.forEachIndexed { i, type ->
+                        Box(
+                            Modifier.weight(1f).aspectRatio(1f)
+                                .background(if (i % 2 == 1) prefs.boardTheme.lightSquare else prefs.boardTheme.darkSquare),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            PreviewPiece(Piece(type, ChessColor.BLACK), prefs.pieceSet, Modifier.fillMaxSize().padding(3.dp))
+                        }
+                    }
+                }
+            }
+            Text(
+                t("Juegos oficiales de Lichess (open source). Se aplica al tablero de la partida y a las vistas previas.",
+                  "Official Lichess sets (open source). Applies to the game board and the previews."),
+                color = Muted, fontSize = 11.sp, lineHeight = 15.sp
+            )
         }
 
         // ============ SONIDOS ============
@@ -222,7 +283,7 @@ fun SettingsScreen(
                 onClick = onExit
             )
             Text(
-                "CHESS-X vX.45 · ${t("Motor FIDE propio ·", "Custom FIDE engine ·")} ${t("conexión SPP segura", "secure SPP link")}",
+                "CHESS-X vX.54 · ${t("Motor FIDE propio ·", "Custom FIDE engine ·")} ${t("conexión SPP segura", "secure SPP link")}",
                 color = Muted, fontSize = 10.sp
             )
         }
@@ -259,6 +320,121 @@ private fun Chip(label: String, selected: Boolean, modifier: Modifier = Modifier
         contentAlignment = Alignment.Center
     ) {
         Text(label, color = if (selected) Gold else Text1, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
+}
+
+/** Orden de presentación en la vista previa de piezas. */
+private val PREVIEW_TYPES = listOf(
+    PieceType.KING, PieceType.QUEEN, PieceType.ROOK,
+    PieceType.BISHOP, PieceType.KNIGHT, PieceType.PAWN
+)
+
+/**
+ * Muestra una pieza con el conjunto elegido (todos los juegos son vectores
+ * oficiales de Lichess, por lo que se pintan igual en cualquier pantalla).
+ */
+@Composable
+private fun PreviewPiece(piece: Piece, pieceSet: PieceSet, modifier: Modifier = Modifier) {
+    Image(
+        painter = painterResource(id = pieceResource(piece, pieceSet)),
+        contentDescription = null,
+        modifier = modifier,
+        contentScale = ContentScale.Fit
+    )
+}
+
+/**
+ * Chip de tema de tablero con una muestra mini del tablero (mismo estilo que
+ * los chips de piezas): 3x2 casillas con los colores del tema.
+ */
+@Composable
+private fun ThemeChip(
+    theme: BoardTheme,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    isEn: Boolean,
+    pieceSet: PieceSet,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .background(if (selected) Color(0xFF26200F) else Card2, RoundedCornerShape(12.dp))
+            .border(1.dp, if (selected) Gold else Line2, RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(vertical = 9.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        // mini tablero 3x2 con las casillas del tema
+        Column(
+            Modifier
+                .size(width = 40.dp, height = 27.dp)
+                .clip(RoundedCornerShape(6.dp))
+        ) {
+            repeat(2) { row ->
+                Row(Modifier.weight(1f).fillMaxWidth()) {
+                    repeat(3) { col ->
+                        val light = (row + col) % 2 == 0
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .background(if (light) theme.lightSquare else theme.darkSquare)
+                        )
+                    }
+                }
+            }
+        }
+        Text(
+            if (isEn) theme.labelEn else theme.labelEs,
+            color = if (selected) Gold else Text1,
+            fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/** Chip de conjunto de piezas con una muestra real sobre casillas del tema. */
+@Composable
+private fun PieceSetChip(
+    pieceSet: PieceSet,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    isEn: Boolean,
+    boardTheme: BoardTheme,
+    onClick: () -> Unit
+) {
+    Column(
+        modifier = modifier
+            .background(if (selected) Color(0xFF26200F) else Card2, RoundedCornerShape(12.dp))
+            .border(1.dp, if (selected) Gold else Line2, RoundedCornerShape(12.dp))
+            .clickable { onClick() }
+            .padding(vertical = 9.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            Modifier
+                .size(width = 40.dp, height = 27.dp)
+                .clip(RoundedCornerShape(6.dp))
+        ) {
+            Box(
+                Modifier.weight(1f).fillMaxHeight().background(boardTheme.lightSquare),
+                contentAlignment = Alignment.Center
+            ) {
+                PreviewPiece(Piece(PieceType.KNIGHT, ChessColor.WHITE), pieceSet, Modifier.fillMaxSize().padding(1.dp))
+            }
+            Box(
+                Modifier.weight(1f).fillMaxHeight().background(boardTheme.darkSquare),
+                contentAlignment = Alignment.Center
+            ) {
+                PreviewPiece(Piece(PieceType.KNIGHT, ChessColor.BLACK), pieceSet, Modifier.fillMaxSize().padding(1.dp))
+            }
+        }
+        Text(
+            if (isEn) pieceSet.labelEn else pieceSet.labelEs,
+            color = if (selected) Gold else Text1,
+            fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

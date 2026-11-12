@@ -69,14 +69,16 @@ fun GameScreen(
     onCancelPromotion: () -> Unit,
     onToggleSound: () -> Unit,
     onDisconnect: () -> Unit,
-    onNewGameSame: () -> Unit = {},
-    onNewGameRandom: () -> Unit = {},
+    onNewGameSame: (Long, Long) -> Unit = { _, _ -> },
+    onNewGameRandom: (Long, Long) -> Unit = { _, _ -> },
     onTournamentNext: () -> Unit = {},
     onBackToRoom: () -> Unit = {},
     onGameEndDismiss: () -> Unit = {},
     onNewTournament: () -> Unit = {},
     onReplayPgn: () -> Unit = {},
-    onNewGameCustomTime: (Long, Long) -> Unit = { _, _ -> }
+    onNewGameCustomTime: (Long, Long) -> Unit = { _, _ -> },
+    /** Reintenta el enlace Bluetooth tras perder la conexion en mitad de la partida. */
+    onRetryConnection: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -230,6 +232,53 @@ fun GameScreen(
             }
         }
 
+        // Conexión perdida en mitad de la partida: el reloj queda congelado y la
+        // partida se guarda en el historial especial para poder retomarla.
+        if (!ui.connected && ui.lobby.gameStarted && ui.gameEnd == null && ui.countdown == null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color(0xE60B0D10)),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    modifier = Modifier
+                        .padding(horizontal = 26.dp)
+                        .fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(54.dp)
+                            .background(Color(0xFF1A1A14), CircleShape)
+                            .border(1.5.dp, Red, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("⚠️", fontSize = 24.sp)
+                    }
+                    Text("Conexión perdida", color = Red, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                    Text(
+                        "El reloj está congelado. La partida se guarda y podrás retomarla " +
+                            "con el mismo turno en cuanto vuelva el rival.",
+                        color = Muted, fontSize = 12.sp, lineHeight = 17.sp, textAlign = TextAlign.Center
+                    )
+                    Button(
+                        onClick = onRetryConnection,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A14), contentColor = Gold),
+                        shape = RoundedCornerShape(14.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, Gold)
+                    ) {
+                        Text("Reintentar conexión", fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+                    }
+                    TextButton(onClick = onDisconnect) {
+                        Text("Salir y guardar la partida", color = Muted, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
         ui.promotionPending?.let {
             PromotionPieceDialog(
                 localColor = ui.localColor,
@@ -284,12 +333,14 @@ fun GameScreen(
                 localPhotoBase64 = localPhotoBase64,
                 remotePhotoBase64 = remoteProfile?.photoBase64,
                 winnerName = winnerName,
+                lastTimeMs = ui.lobby.timeMs,
+                lastIncMs = ui.lobby.incrementMs,
                 onNewGameSame = onNewGameSame,
                 onNewGameRandom = onNewGameRandom,
                 onTournamentNext = onTournamentNext,
                 onBackToRoom = onBackToRoom,
-                onReplayPgn = { /* handled in MainActivity */ },
-                onNewGameCustomTime = { timeMs, incMs -> /* handled in MainActivity */ },
+                onReplayPgn = onReplayPgn,
+                onNewGameCustomTime = onNewGameCustomTime,
                 onDismiss = onGameEndDismiss
             )
         }
