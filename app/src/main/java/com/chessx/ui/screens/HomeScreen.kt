@@ -40,7 +40,9 @@ fun HomeScreen(
     clockSummary: String,
     onProfile: () -> Unit,
     onCreate: () -> Unit,
-    onSearch: () -> Unit
+    onSearch: () -> Unit,
+    updateVersion: String? = null,
+    onUpdateClick: () -> Unit = {}
 ) {
     val uriHandler = LocalUriHandler.current
     val openGitHub: () -> Unit = {
@@ -89,6 +91,34 @@ fun HomeScreen(
                 ) {
                     Box(Modifier.size(7.dp).background(if (inSession) Green else Muted, CircleShape))
                     Text(if (inSession) "Conectado" else "Bluetooth", color = if (inSession) Green else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        // Aviso pequeño de actualización disponible
+        if (updateVersion != null) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().clickable(onClick = onUpdateClick),
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF1E1A0C),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF6B5518))
+            ) {
+                Row(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Box(
+                        Modifier.size(22.dp).clip(CircleShape).background(Color(0xFFE2B94E), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("↑", color = Color(0xFF151203), fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                        Text("Actualización disponible", color = Color(0xFFE8C766), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("CHESS-X $updateVersion · pulsa para instalar", color = Color(0xFFA7966A), fontSize = 9.5.sp)
+                    }
+                    Text("›", color = Color(0xFFE2B94E), fontSize = 16.sp, fontWeight = FontWeight.Light)
                 }
             }
         }

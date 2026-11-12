@@ -97,6 +97,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         prefs = AppPreferences(applicationContext)
+        // Borra APKs de actualización antiguos/fallidos para no acumular basura
+        try { UpdateManager.getInstance(applicationContext).cleanupStaleUpdates() } catch (_: Exception) { }
 
         val factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -175,6 +177,18 @@ class MainActivity : ComponentActivity() {
         var showConnectionSuccess by remember { mutableStateOf(false) }
         var wasWaitingHost by remember { mutableStateOf(false) }
         val updateScope = remember { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
+        val updateManager = remember { UpdateManager.getInstance(activity) }
+        val updateState by updateManager.updateState.collectAsStateWithLifecycle()
+        var homeUpdateVersion by remember { mutableStateOf<String?>(null) }
+
+        // Comprueba actualizaciones al arrancar (silencioso) para mostrar el aviso en Home
+        LaunchedEffect(Unit) {
+            try {
+                updateManager.checkForUpdate().getOrNull()?.let { r ->
+                    if (r.hasUpdate) homeUpdateVersion = r.remoteVersion.versionName
+                }
+            } catch (_: Exception) {}
+        }
 
         LaunchedEffect(screen) {
             if (screen == Screen.PROFILE || screen == Screen.STATS) history = GameHistoryStore.load(activity)
@@ -284,6 +298,11 @@ class MainActivity : ComponentActivity() {
                             profileNextScreen = Screen.CONNECT
                             screen = Screen.PROFILE
                         },
+                        updateVersion = homeUpdateVersion,
+                        onUpdateClick = {
+                            homeUpdateVersion = null
+                            screen = Screen.SETTINGS
+                        }
                     )
 
                     Screen.CONNECT -> {

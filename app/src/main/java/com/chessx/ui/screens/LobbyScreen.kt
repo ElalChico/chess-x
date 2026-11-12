@@ -313,6 +313,65 @@ fun LobbyScreen(
             }
         }
 
+        // Historial de torneos (separado del historial común)
+        val tournamentRecords = remember { mutableStateOf(com.chessx.data.TournamentStore.load(context)) }
+        var showTournaments by remember { mutableStateOf(false) }
+
+        if (showTournaments) {
+            TournamentHistoryDialog(
+                records = tournamentRecords.value,
+                onDismiss = { showTournaments = false },
+                onClearAll = {
+                    com.chessx.data.TournamentStore.clear(context)
+                    tournamentRecords.value = emptyList()
+                },
+                onDelete = { id ->
+                    com.chessx.data.TournamentStore.remove(context, id)
+                    tournamentRecords.value = com.chessx.data.TournamentStore.load(context)
+                }
+            )
+        }
+
+        SectionLabel("HISTORIAL DE TORNEOS")
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showTournaments = true },
+            shape = RoundedCornerShape(16.dp),
+            color = Color(0xFF1A160C),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF6B5518))
+        ) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFE2B94E), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("T", fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF151203))
+                }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        "Torneos" + if (tournamentRecords.value.isNotEmpty()) " · ${tournamentRecords.value.size}" else "",
+                        color = Color(0xFFE8C766), fontSize = 14.sp, fontWeight = FontWeight.ExtraBold
+                    )
+                    Text(
+                        if (tournamentRecords.value.isEmpty()) "Aún no has jugado torneos. Pulsa para ver el historial."
+                        else "Partidas por torneo con colores alternos y marcador acumulado",
+                        color = Color(0xFFA7966A), fontSize = 10.sp
+                    )
+                }
+                Text("›", color = Gold, fontSize = 22.sp, fontWeight = FontWeight.Light)
+            }
+        }
+
         // History (PGN) — each entry replays with its captured data
         Row(verticalAlignment = Alignment.CenterVertically) {
             SectionLabel("HISTORIAL (PGN)")
@@ -528,6 +587,192 @@ internal fun RemoteAvatarMini(photo: String?, name: String) {
         } else {
             Text((name.firstOrNull() ?: 'R').uppercaseChar().toString(), fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Text1)
         }
+    }
+}
+
+/**
+ * Diálogo con el historial de torneos: marcador acumulado, resultado por partida
+ * y opción de borrar torneos individuales o todo el historial.
+ */
+@Composable
+private fun TournamentHistoryDialog(
+    records: List<com.chessx.data.TournamentRecord>,
+    onDismiss: () -> Unit,
+    onClearAll: () -> Unit,
+    onDelete: (String) -> Unit
+) {
+    var confirmClear by remember { mutableStateOf(false) }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth(0.94f)
+                .wrapContentHeight()
+                .padding(vertical = 24.dp),
+            shape = RoundedCornerShape(22.dp),
+            color = Color(0xFF0F141B),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFF6B5518))
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp)
+                    .heightIn(max = 520.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        Modifier
+                            .size(38.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(Color(0xFFE2B94E), RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text("T", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF151203))
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("Historial de torneos", color = Text1, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+                        Text("${records.size} torneo${if (records.size == 1) "" else "s"} guardado${if (records.size == 1) "" else "s"}", color = Muted, fontSize = 11.sp)
+                    }
+                    Text(
+                        "✕",
+                        modifier = Modifier.clickable(onClick = onDismiss).padding(8.dp),
+                        color = Muted,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                if (records.isEmpty()) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF141B24), RoundedCornerShape(14.dp))
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text("🏆", fontSize = 34.sp)
+                            Text("Todavía no hay torneos", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            Text("Crea un torneo desde la sala para jugar varias partidas con colores alternos.",
+                                color = Muted, fontSize = 10.sp)
+                        }
+                    }
+                } else {
+                    records.forEach { rec ->
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF141B24), RoundedCornerShape(16.dp))
+                                .border(1.dp, Color(0xFF2A313B), RoundedCornerShape(16.dp))
+                                .padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(7.dp)
+                        ) {
+                            val won = rec.localScore > rec.remoteScore
+                            val lost = rec.localScore < rec.remoteScore
+                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Text(rec.opponent, color = Text1, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                                    Text("${rec.dateLabel()} · ${rec.games} partidas · ${rec.timeLabel}", color = Muted, fontSize = 10.sp)
+                                }
+                                val badgeColor = when {
+                                    won -> Green
+                                    lost -> Color(0xFFFF6B6B)
+                                    else -> Color(0xFF8B96A5)
+                                }
+                                Box(
+                                    Modifier
+                                        .background(badgeColor.copy(alpha = 0.16f), RoundedCornerShape(8.dp))
+                                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                                ) {
+                                    Text(rec.resultLabel, color = badgeColor, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                                }
+                                Spacer(Modifier.width(6.dp))
+                                Text(
+                                    "🗑",
+                                    modifier = Modifier
+                                        .clickable { onDelete(rec.id) }
+                                        .padding(6.dp),
+                                    fontSize = 15.sp
+                                )
+                            }
+                            // Marcador acumulado
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                ScorePill("Tú", rec.localScore, won = won)
+                                ScorePill("Rival", rec.remoteScore, won = lost)
+                                ScorePill("Tablas", rec.draws.toDouble(), won = false, neutral = true)
+                            }
+                            // Resultados por partida
+                            if (rec.gameResults.isNotEmpty()) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    rec.gameResults.forEach { r ->
+                                        val wonGame = r.contains(": V")
+                                        val lostGame = r.contains(": D")
+                                        val chipColor = when {
+                                            wonGame -> Green
+                                            lostGame -> Color(0xFFFF6B6B)
+                                            else -> Color(0xFF8B96A5)
+                                        }
+                                        Box(
+                                            Modifier
+                                                .background(chipColor.copy(alpha = 0.12f), RoundedCornerShape(6.dp))
+                                                .padding(horizontal = 7.dp, vertical = 3.dp)
+                                        ) {
+                                            Text(r, color = chipColor, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (!confirmClear) {
+                        TextButton(onClick = { confirmClear = true }) {
+                            Text("Borrar todo el historial de torneos", color = Color(0xFFFF9B9B), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    } else {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(Color(0xFF2A1616), RoundedCornerShape(12.dp))
+                                .padding(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("¿Borrar todos los torneos?", color = Color(0xFFFF9B9B), fontSize = 12.sp, modifier = Modifier.weight(1f))
+                            TextButton(onClick = { confirmClear = false }) { Text("Cancelar", color = Muted, fontSize = 12.sp) }
+                            TextButton(onClick = { onClearAll(); confirmClear = false }) {
+                                Text("Borrar", color = Color(0xFFFF6B6B), fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScorePill(label: String, score: Double, won: Boolean, neutral: Boolean = false) {
+    val color = when {
+        neutral -> Color(0xFF8B96A5)
+        won -> Green
+        else -> Color(0xFF8B96A5)
+    }
+    Column(
+        Modifier
+            .background(Color(0xFF1B232E), RoundedCornerShape(10.dp))
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(if (score % 1.0 == 0.0) score.toInt().toString() else score.toString(), color = if (won) Green else Text1, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+        Text(label, color = Muted, fontSize = 9.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 

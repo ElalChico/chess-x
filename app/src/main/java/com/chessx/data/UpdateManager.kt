@@ -141,16 +141,27 @@ class UpdateManager private constructor(context: Context) {
             val prerelease = obj.getBoolean("prerelease")
             val assets = obj.getJSONArray("assets")
 
-            // Buscar APK en assets
+            // Buscar APK en assets. Acepta CUALQUIER .apk (el nombre puede ser
+            // "app-release.apk", "CHESS-X-X.55.apk", etc.) y prioriza el de mayor tamaño
+            // por si hay varios assets. Evita fallos si el nombre no contiene "chess-x".
             var apkUrl: String? = null
             var apkSize = 0L
             for (i in 0 until assets.length()) {
                 val asset = assets.getJSONObject(i)
                 val assetName = asset.getString("name")
-                if (assetName.endsWith(".apk") && assetName.contains("chess-x", true)) {
-                    apkUrl = asset.getString("browser_download_url")
-                    apkSize = asset.getLong("size")
-                    break
+                if (!assetName.endsWith(".apk", true)) continue
+                val size = asset.optLong("size", 0L)
+                val url = asset.optString("browser_download_url", "")
+                if (url.isBlank()) continue
+                // Prioridad: nombres con "chess-x"/"chessx" primero, si no, el más grande
+                val preferred = assetName.contains("chess-x", true) || assetName.contains("chessx", true)
+                val currentPreferred = apkUrl != null && (
+                    apkUrl!!.substringAfterLast("/").contains("chess-x", true) ||
+                    apkUrl!!.substringAfterLast("/").contains("chessx", true)
+                )
+                if (apkUrl == null || (preferred && !currentPreferred) || (preferred == currentPreferred && size >= apkSize)) {
+                    apkUrl = url
+                    apkSize = size
                 }
             }
 
@@ -187,6 +198,25 @@ class UpdateManager private constructor(context: Context) {
     }
 
     /**
+     * Borra APKs de actualización antiguos/fallidos para no acumular basura.
+     * Se llama al arrancar la app y también antes de cada descarga.
+     */
+    fun cleanupStaleUpdates(maxAgeMs: Long = 24 * 60 * 60 * 1000L) {
+        try {
+            val dir = ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: return
+            val now = System.currentTimeMillis()
+            dir.listFiles { f ->
+                f.name.startsWith("chess-x-update") && f.name.endsWith(".apk")
+            }?.forEach { f ->
+                // Borra siempre los muy antiguos; los fallidos se re-crean con nombre único
+                if (now - f.lastModified() > maxAgeMs || f.length() == 0L) {
+                    try { f.delete() } catch (_: Exception) { }
+                }
+            }
+        } catch (_: Exception) { }
+    }
+
+    /**
      * Descarga e instala el APK (método directo sin Play Store)
      * Requiere: APK firmado con MISMO keystore
      */
@@ -194,10 +224,15 @@ class UpdateManager private constructor(context: Context) {
         apkUrl: String,
         onProgress: (Float) -> Unit = {}
     ): Result<Unit> {
+        // Limpieza previa: borra descargas fallidas/viejas para no acumular basura
+        cleanupStaleUpdates(0L)
+        // Nombre único con marca de tiempo: evita colisiones con descargas fallidas
+        val file = File(
+            ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+            "chess-x-update-${System.currentTimeMillis()}.apk"
+        )
+
         _updateState.value = UpdateState.Downloading(0f)
-        
-        val file = File(ctx.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), "chess-x-update.apk")
-        if (file.exists()) file.delete()
 
         return suspendCoroutine { cont ->
             val request = Request.Builder().url(apkUrl).build()
@@ -205,6 +240,8 @@ class UpdateManager private constructor(context: Context) {
             client.newCall(request).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
                     Log.e("UpdateManager", "downloadAndInstall failed", e)
+                    // Borra cualquier archivo parcial para no dejar basura
+                    try { file.delete() } catch (_: Exception) { }
                     _updateState.value = UpdateState.Error(e.message ?: "Error descargando")
                     cont.resume(Result.failure(e))
                 }
@@ -214,13 +251,19 @@ class UpdateManager private constructor(context: Context) {
                         if (!response.isSuccessful) {
                             _updateState.value = UpdateState.Error("Descarga falló: HTTP ${response.code}")
                             response.close()
+                            try { file.delete() } catch (_: Exception) { }
                             cont.resume(Result.failure(Exception("HTTP ${response.code}")))
                             return
                         }
-                        
+
                         val total = response.body?.contentLength() ?: 0L
                         var downloaded = 0L
-                        val source: BufferedSource = response.body?.source() ?: return
+                        val source: BufferedSource = response.body?.source() ?: run {
+                            try { file.delete() } catch (_: Exception) { }
+                            _updateState.value = UpdateState.Error("Descarga fallida: respuesta vacía")
+                            cont.resume(Result.failure(Exception("Respuesta vacía")))
+                            return
+                        }
                         val sink: BufferedSink = FileOutputStream(file).sink().buffer()
                         
                         val buffer = Buffer()
@@ -239,12 +282,21 @@ class UpdateManager private constructor(context: Context) {
                         sink.close()
                         source.close()
                         response.close()
-                        
+
+                        // Descarga incompleta: no intentar instalar, borrar basura
+                        if (total > 0 && downloaded != total) {
+                            try { file.delete() } catch (_: Exception) { }
+                            _updateState.value = UpdateState.Error("Descarga interrumpida (${downloaded / 1024} KB de ${total / 1024} KB). Vuelve a intentarlo.")
+                            cont.resume(Result.failure(Exception("Descarga incompleta")))
+                            return
+                        }
+
                         _updateState.value = UpdateState.Downloaded(file)
                         val installResult = installApk(file)
                         cont.resume(installResult)
                     } catch (e: Exception) {
                         Log.e("UpdateManager", "downloadAndInstall failed", e)
+                        try { file.delete() } catch (_: Exception) { }
                         _updateState.value = UpdateState.Error(e.message ?: "Error descargando")
                         cont.resume(Result.failure(e))
                     }
@@ -255,27 +307,47 @@ class UpdateManager private constructor(context: Context) {
 
     /**
      * Instala APK usando Intent (Android 8+ usa FileProvider)
-     * MISMO keystore = datos preservados automáticamente
+     * El instalador de Android siempre REEMPLAZA la versión instalada
+     * (mismo packageId + misma firma + versionCode mayor). No se conservan
+     * copias duplicadas de la app; el APK descargado se borra en el próximo arranque.
      */
     private fun installApk(file: File): Result<Unit> {
+        // Validar que la descarga quedó completa antes de intentar instalar
+        if (!file.exists() || file.length() == 0L) {
+            try { file.delete() } catch (_: Exception) { }
+            _updateState.value = UpdateState.Error("Descarga incompleta o dañada. Vuelve a intentarlo.")
+            return Result.failure(Exception("APK inválido"))
+        }
         return try {
-            val uri: Uri
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                uri = FileProvider.getUriForFile(
+            // Android 8+: comprobar permiso para instalar apps desconocidas
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val pm2 = ctx.packageManager
+                if (!pm2.canRequestPackageInstalls()) {
+                    _updateState.value = UpdateState.Error("Activa «Instalar apps desconocidas» para CHESS-X y pulsa de nuevo")
+                    try {
+                        val settingsIntent = Intent(android.provider.Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                            data = android.net.Uri.parse("package:${ctx.packageName}")
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        }
+                        ctx.startActivity(settingsIntent)
+                    } catch (_: Exception) { }
+                    return Result.failure(Exception("Permiso de instalación no concedido"))
+                }
+            }
+
+            val uri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                FileProvider.getUriForFile(
                     ctx,
                     "${ctx.packageName}.fileprovider",
                     file
                 )
             } else {
-                uri = Uri.fromFile(file)
+                Uri.fromFile(file)
             }
 
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, "application/vnd.android.package-archive")
                 flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
             }
 
             // Verificar que hay actividad para manejar el intent
@@ -333,6 +405,11 @@ class UpdateManager private constructor(context: Context) {
 
     fun clearUpdateState() {
         _updateState.value = UpdateState.Idle
+    }
+
+    /** Marca un error cuando la release no tiene un APK descargable. */
+    fun reportMissingApk() {
+        _updateState.value = UpdateState.Error("La release no incluye un APK descargable")
     }
 }
 

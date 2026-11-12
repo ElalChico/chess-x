@@ -677,10 +677,26 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
         val t = _ui.value.tournament
         if (!t.active) return
         val localWon = end.winner?.let { it == _ui.value.localColor }
+        val playedNumber = t.played + 1
+        val gameTag = when (localWon) {
+            true -> "V"
+            false -> "D"
+            null -> "E"
+        }
+        val reasonLabel = when (end.reason) {
+            GameEndReason.CHECKMATE -> "Mate"
+            GameEndReason.STALEMATE -> "Ahogado"
+            GameEndReason.DRAW_INSUFFICIENT -> "Material"
+            GameEndReason.DRAW_FIFTY -> "Regla 50"
+            GameEndReason.RESIGNATION -> "Rendición"
+            GameEndReason.TIMEOUT -> "Tiempo"
+            GameEndReason.DRAW_AGREED -> "Acordadas"
+        }
+        val gameResults = t.gameResults + "Partida $playedNumber: $gameTag · $reasonLabel"
         val nt = when (localWon) {
-            true -> t.copy(localWins = t.localWins + 1, played = t.played + 1)
-            false -> t.copy(remoteWins = t.remoteWins + 1, played = t.played + 1)
-            null -> t.copy(draws = t.draws + 1, played = t.played + 1)
+            true -> t.copy(localWins = t.localWins + 1, played = t.played + 1, gameResults = gameResults)
+            false -> t.copy(remoteWins = t.remoteWins + 1, played = t.played + 1, gameResults = gameResults)
+            null -> t.copy(draws = t.draws + 1, played = t.played + 1, gameResults = gameResults)
         }
         _ui.value = _ui.value.copy(tournament = nt, sessionGames = _ui.value.sessionGames + 1)
         if (nt.finished) {
@@ -695,7 +711,7 @@ class GameViewModel(private val appContext: Context) : ViewModel() {
                     draws = nt.draws,
                     timeLabel = if (nt.config.timeMs == 0L) "Ilimitado"
                                 else "${nt.config.timeMs / 60000} + ${nt.config.incrementMs / 1000}",
-                    gameResults = emptyList()
+                    gameResults = nt.gameResults
                 ))
             } catch (_: Exception) { }
             _ui.value = _ui.value.copy(tournament = nt.copy(active = false))

@@ -612,9 +612,18 @@ private fun UpdateSection(
                     }
                     
                     // Botones de acción
+                    val apkUrl = result.apkUrl
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(
-                            onClick = { onDownloadClick(); scope.launch { updateManager.downloadAndInstall(result.apkUrl!!) { p -> } } },
+                            onClick = {
+                                if (apkUrl != null) {
+                                    onDownloadClick()
+                                    scope.launch { updateManager.downloadAndInstall(apkUrl) { p -> } }
+                                } else {
+                                    updateManager.reportMissingApk()
+                                }
+                            },
+                            enabled = apkUrl != null,
                             modifier = Modifier.weight(1f).padding(bottom = 4.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1A1A14), contentColor = Gold),
                             border = androidx.compose.foundation.BorderStroke(1.5.dp, Gold),
@@ -627,7 +636,11 @@ private fun UpdateSection(
                                     contentDescription = null,
                                     tint = Gold
                                 )
-                                Text(translate("Descargar e instalar", "Download & install"), fontWeight = FontWeight.ExtraBold, fontSize = 12.sp)
+                                Text(
+                                    if (apkUrl != null) translate("Descargar e instalar", "Download & install")
+                                    else translate("APK no disponible", "APK not available"),
+                                    fontWeight = FontWeight.ExtraBold, fontSize = 12.sp
+                                )
                             }
                         }
                         Button(

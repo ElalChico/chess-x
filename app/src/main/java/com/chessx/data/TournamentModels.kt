@@ -26,7 +26,9 @@ data class TournamentState(
     val remoteWins: Int = 0,
     val draws: Int = 0,
     val localColorWhite: Boolean = true,
-    val active: Boolean = false
+    val active: Boolean = false,
+    /** Resultado de cada partida jugada: "V · Mate", "D · Tiempo", "E · Tablas" … */
+    val gameResults: List<String> = emptyList()
 ) {
     val totalGames: Int get() = config.games
     val finished: Boolean get() = played >= totalGames
